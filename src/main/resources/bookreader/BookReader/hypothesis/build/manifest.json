@@ -1,0 +1,20 @@
+{
+  "scripts/annotator.bundle.js": "scripts/annotator.bundle.js?ec4e21",
+  "styles/annotator.css": "styles/annotator.css?b497a3",
+  "styles/annotator.css.map": "styles/annotator.css.map?b9df74",
+  "styles/highlights.css": "styles/highlights.css?468946",
+  "styles/highlights.css.map": "styles/highlights.css.map?ee982b",
+  "styles/katex.min.css": "styles/katex.min.css?921c28",
+  "styles/katex.min.css.map": "styles/katex.min.css.map?e7e03f",
+  "styles/pdfjs-overrides.css": "styles/pdfjs-overrides.css?c95edf",
+  "styles/pdfjs-overrides.css.map": "styles/pdfjs-overrides.css.map?1d8ac6",
+  "styles/sidebar.css": "styles/sidebar.css?c949f4",
+  "styles/sidebar.css.map": "styles/sidebar.css.map?c4cba4",
+  "styles/ui-playground.css": "styles/ui-playground.css?6778a6",
+  "styles/ui-playground.css.map": "styles/ui-playground.css.map?0e6471",
+  "scripts/annotator.bundle.js.map": "scripts/annotator.bundle.js.map?f54a85",
+  "scripts/sidebar.bundle.js": "scripts/sidebar.bundle.js?ebe014",
+  "scripts/ui-playground.bundle.js": "scripts/ui-playground.bundle.js?7f00d1",
+  "scripts/sidebar.bundle.js.map": "scripts/sidebar.bundle.js.map?8d641e",
+  "scripts/ui-playground.bundle.js.map": "scripts/ui-playground.bundle.js.map?704464"
+}
