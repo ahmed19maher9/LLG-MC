@@ -301,6 +301,29 @@
         </executions>
       </plugin>
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-resources-plugin</artifactId>
+        <version>3.3.1</version>
+        <executions>
+          <execution>
+            <id>copy-bookreader-resources</id>
+            <phase>package</phase>
+            <goals>
+              <goal>copy-resources</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>${project.build.directory}/classes/bookreader</outputDirectory>
+              <resources>
+                <resource>
+                  <directory>src/main/resources/bookreader</directory>
+                  <filtering>false</filtering>
+                </resource>
+              </resources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>exec-maven-plugin</artifactId>
         <version>3.1.0</version>
@@ -319,6 +342,8 @@
               <goal>shade</goal>
             </goals>
             <configuration>
+              <shadedArtifactAttached>true</shadedArtifactAttached>
+              <shadedClassifierName>shaded</shadedClassifierName>
               <filters>
                 <filter>
                   <artifact>*:*</artifact>
@@ -338,7 +363,7 @@
           </execution>
         </executions>
       </plugin>
-      <!-- <plugin>
+      <plugin>
         <groupId>org.panteleyev</groupId>
         <artifactId>jpackage-maven-plugin</artifactId>
         <version>1.6.0</version>
@@ -350,21 +375,29 @@
               <goal>jpackage</goal>
             </goals>
             <configuration>
-              <name>llg-mc</name>
+              <name>LLG-MC</name>
               <appVersion>0.0.1</appVersion>
-              <vendor>Your Company</vendor>
+              <vendor>LLG</vendor>
               <description>LLG MC Application</description>
               <input>${project.build.directory}</input>
               <destination>${project.build.directory}/dist</destination>
-              <mainJar>llg-mc-0.0.1-SNAPSHOT.jar</mainJar>
+              <mainJar>${project.build.finalName}.jar</mainJar>
               <javaOptions>
-                <javaOption>-Djava.library.path=${project.build.directory}/lib</javaOption>
+                <javaOption>-Djava.library.path=lib</javaOption>
               </javaOptions>
-              <winConsole>true</winConsole>
+              <winConsole>false</winConsole>
+              <winMenu>true</winMenu>
+              <winShortcut>true</winShortcut>
+              <arguments>
+                <argument>--verbose</argument>
+                <argument>-sice:ICE03</argument>
+                <argument>-sice:ICE33</argument>
+                <argument>-sice:ICE61</argument>
+              </arguments>
             </configuration>
           </execution>
         </executions>
-      </plugin> -->
+      </plugin>
     </plugins>
   </build>
 </project>

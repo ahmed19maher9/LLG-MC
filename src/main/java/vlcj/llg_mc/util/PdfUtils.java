@@ -213,10 +213,11 @@ public class PdfUtils {
 		html.append("<style id='llg-cursor-styles'>");
 		html.append("body, #BookReader, #BookReader * { cursor: text !important; }");
 		html.append(".BRtoolbar { background-color: #2c3e50 !important; }");
-		html.append("#BookReader { position: relative; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; }");
-		html.append(".BRpage { position: relative; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; }");
-		html.append(".BRpagecontainer { position: relative; cursor: text !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; }");
-		html.append(".BRpageimage { position: relative; z-index: 1; pointer-events: auto !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; user-select: text !important; }");
+		html.append(
+				"#BookReader { position: relative; -webkit-user-select: text; -moz-user-select: text; -ms-user-select: text; user-select: text; }");
+		html.append(".BRpage { position: relative; }");
+		html.append(".BRpagecontainer { position: relative; cursor: text !important; }");
+		html.append(".BRpageimage { position: relative; z-index: 1; pointer-events: none !important; }");
 		html.append(".BRtextLayer { ");
 		html.append("  position: absolute; ");
 		html.append("  left: 0; ");

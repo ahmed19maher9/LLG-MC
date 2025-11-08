@@ -9,8 +9,6 @@
     <!-- JS dependencies -->
     <script src="../BookReader/webcomponents-bundle.js"></script>
     <script src="../BookReader/jquery-3.js"></script>
-    <!-- Tesseract.js for OCR -->
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.1.1/dist/tesseract.min.js"></script>
 
     <!-- BookReader and plugins -->
     <link rel="stylesheet" href="../BookReader/BookReader.css"/>
@@ -21,14 +19,9 @@
 
     <!-- Custom CSS overrides -->
     <link rel="stylesheet" href="BookReaderDemo.css"/>
-    <!-- Font Awesome for icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"/>
     <style>
       html, body {
         height: 100%;
-        margin: 0;
-        padding: 0;
-        overflow: hidden;
       }
       body.BRfullscreenActive {
         background: #000;
@@ -50,101 +43,81 @@
       #BookReader .BRtoolbarSectionLogo {
         display: none !important;
       }
-
+    
+      
       /* Text overlay styles */
+      .BRpagecontainer {
+        position: relative;
+      }
+      .BRpageimage {
+        position: relative;
+      }
+      /* Make sure the overlay is on top and interactive */
       .BRtextOverlay {
         position: absolute !important;
         top: 0 !important;
         left: 0 !important;
         width: 100% !important;
         height: 100% !important;
-        z-index: 2147483647 !important;
-        pointer-events: none !important;
-        overflow: visible !important;
-        background-color: transparent !important;
-        box-sizing: border-box !important;
-        margin: 0 !important;
-        padding: 0 !important;
-      }
-
-      /* Ensure page containers are positioned relatively */
-      #BookReader .BRpagecontainer {
-        position: relative !important;
-      }
-
-      .ocr-text {
-        position: absolute !important;
-        color: rgba(0, 0, 0, 0.7) !important;
+        z-index: 1000 !important;
         pointer-events: auto !important;
-        cursor: text !important;
-        user-select: text !important;
         -webkit-user-select: text !important;
+        -khtml-user-select: text !important;
         -moz-user-select: text !important;
         -ms-user-select: text !important;
-        white-space: nowrap !important;
-        overflow: visible !important;
-        z-index: 1000001 !important;
-        background-color: rgba(255, 255, 255, 0.8) !important;
-        padding: 1px 2px !important;
-        border-radius: 2px !important;
-        font-weight: normal !important;
+        user-select: text !important;
+        cursor: text !important;
+        mix-blend-mode: multiply; /* Makes text more readable over images */
       }
-
-      .ocr-text::selection {
-        background: rgba(100, 180, 255, 0.8) !important;
-        color: rgba(0, 0, 0, 1) !important;
+      
+      /* Reset pointer-events and ensure text selection for all elements inside the overlay */
+      .BRtextOverlay * {
+        pointer-events: auto !important;
+        -webkit-user-select: text !important;
+        -khtml-user-select: text !important;
+        -moz-user-select: text !important;
+        -ms-user-select: text !important;
+        user-select: text !important;
+        cursor: text !important;
       }
-
-      /* OCR Loading indicator */
-      .ocr-loading {
+      .BRtextOverlay span {
         position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: rgba(0, 0, 0, 0.8);
-        color: white;
-        padding: 15px 25px;
-        border-radius: 8px;
-        z-index: 1001;
-        font-size: 16px;
-        font-weight: bold;
-        text-align: center;
-        min-width: 200px;
+        white-space: pre;
+        color: rgba(0, 0, 0, 0.8); /* Make text visible */
+        pointer-events: auto !important;
+        -webkit-user-select: text !important;
+        user-select: text !important;
+        cursor: text !important;
+        line-height: 1.2;
+        transform-origin: 0 0;
+        pointer-events: auto;
+        cursor: text;
+        user-select: text;
+        -webkit-user-select: text;
+        -moz-user-select: text;
+        -ms-user-select: text;
+        background: rgba(255, 255, 255, 0.7); /* Slightly more opaque for better readability */
+        padding: 2px 4px;
+        border-radius: 3px;
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        margin: -1px; /* Compensate for border */
       }
-
-      /* OCR Toggle Button */
-      .ocr-toggle-btn {
-        position: fixed !important;
-        top: 20px !important;
-        right: 20px !important;
-        background: rgba(0, 0, 0, 0.7) !important;
-        color: white !important;
-        border: 2px solid #fff !important;
-        border-radius: 8px !important;
-        padding: 10px 15px !important;
-        font-size: 14px !important;
-        font-weight: bold !important;
-        cursor: pointer !important;
-        z-index: 2147483646 !important;
-        transition: all 0.3s ease !important;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3) !important;
-        display: block !important;
-        visibility: visible !important;
-        opacity: 1 !important;
+      
+      /* Improve text selection appearance */
+      .BRtextOverlay span::selection,
+      .BRtextOverlay span *::selection {
+        background: rgba(0, 120, 255, 0.5) !important;
+        color: #000 !important;
+        text-shadow: none !important;
       }
-
-      .ocr-toggle-btn:hover {
-        background: rgba(0, 0, 0, 0.9) !important;
-        transform: scale(1.05) !important;
-      }
-
-      .ocr-toggle-btn.active {
-        background: rgba(33, 150, 243, 0.9) !important;
-        border-color: #2196f3 !important;
-      }
-
-      .ocr-toggle-btn.hidden {
-        display: none !important;
+      
+      /* For Firefox */
+      .BRtextOverlay span::-moz-selection,
+      .BRtextOverlay span *::-moz-selection {
+        background: rgba(0, 120, 255, 0.5) !important;
+        color: #000 !important;
+        text-shadow: none !important;
       }
     </style>
 </head>
@@ -153,690 +126,429 @@
   <script type="text/javascript" src="BookReaderJSSimple.js"></script>
   <script type="text/javascript" src="../BookReader/plugins/plugin.text_selection.js"></script>
   <script>
-    // Text file loading configuration
-    const TEXT_FILE_CONFIG = {
-      suffix: '.txt'
-    };
+    // Sample text data - in a real app, this would come from OCR data
+    // Format: { pageIndex: [{ text: 'word', x: 0, y: 0, width: 100, height: 20 }, ...] }
+    const textLayers = {};
 
-    // Cache for text file content to avoid reprocessing
-    const textFileCache = new Map();
-
-    // OCR visibility state
-    let ocrTextVisible = false;
-
-    // Track pages currently being processed to prevent infinite loops
-    const processingPages = new Set();
-
-    // Track pages that have failed text loading to prevent retry loops
-    const failedPages = new Set();
-
-    // Function to create OCR toggle button
-    function createOCRToggleButton() {
-      const button = document.createElement('button');
-      button.className = 'ocr-toggle-btn';
-      button.innerHTML = '<i class="fas fa-eye"></i> Show OCR Text';
-      button.onclick = toggleOCRText;
-      document.body.appendChild(button);
-      return button;
-    }
-
-    // Function to toggle OCR text visibility
-    async function toggleOCRText() {
-      ocrTextVisible = !ocrTextVisible;
-      const button = document.querySelector('.ocr-toggle-btn');
-
-      if (ocrTextVisible) {
-        // Show OCR text - if no overlays exist, check cache and recreate if needed
-        const existingOverlays = $('.BRtextOverlay');
-        console.log('[OCR] Toggle clicked, existing overlays:', existingOverlays.length);
-
-        // Get current page from BookReader if available
-        let currentPageIndex = -1;
-        if (window.llgBookReader && typeof window.llgBookReader.currentIndex === 'function') {
-          currentPageIndex = window.llgBookReader.currentIndex();
-          console.log('[OCR] Current page index from BookReader:', currentPageIndex);
-        }
-
-        // Check if we have cached data
-        const hasCachedData = currentPageIndex >= 0 && window.ocrCache && window.ocrCache[currentPageIndex] !== undefined;
-        const cachedDataLength = hasCachedData ? (window.ocrCache[currentPageIndex]?.length || 0) : 0;
-        
-        // Check for existing overlays (including hidden ones)
-        const allOverlays = $('.BRtextOverlay');
-        const pageOverlays = currentPageIndex >= 0 ? $(`.BRtextOverlay[data-page="${currentPageIndex}"]`) : $();
-        const needsOverlayCreation = pageOverlays.length === 0 && hasCachedData && cachedDataLength > 0;
-        
-        console.log('[OCR] Overlay status:', {
-          allOverlays: allOverlays.length,
-          pageOverlays: pageOverlays.length,
-          currentPage: currentPageIndex,
-          hasCachedData,
-          cachedDataLength,
-          needsOverlayCreation
-        });
-        
-        if (needsOverlayCreation) {
-          console.log('[OCR] Found cached data but no overlays, recreating overlays from cache...');
-          // Recreate overlays from cache
-          const pageContainer = $(`#pagediv${currentPageIndex}`);
-          const pageImage = $(`#page${currentPageIndex}`);
-          if (pageContainer.length && pageImage.length) {
-            updateTextOverlay(currentPageIndex, pageContainer, pageImage[0], window.ocrCache[currentPageIndex]);
-          } else {
-            console.warn('[OCR] Cannot recreate overlays - page container/image not found');
+    function addTextOverlay() {
+      // Wait for BookReader to be initialized
+      const checkBookReader = setInterval(() => {
+        if (window.llgBookReader) {
+          clearInterval(checkBookReader);
+          const br = window.llgBookReader;
+          
+          // Initialize text selection plugin if available
+          if (br.plugins && br.plugins.TextSelection) {
+            br.plugins.TextSelection.attach();
           }
-        } else if (pageOverlays.length === 0 && (!hasCachedData || currentPageIndex < 0)) {
-          console.log('[OCR] No overlays found and no cached data, triggering OCR processing...');
-
-          // Try to get current page from BookReader first
-          if (currentPageIndex >= 0) {
-            const pageContainer = $(`#pagediv${currentPageIndex}`);
-            const pageImage = $(`#page${currentPageIndex}`);
+          
+          // Override the drawLeaf function to add our text overlay
+          const originalDrawLeaf = br.drawLeaf;
+          br.drawLeaf = function(index, leaf) {
+            // Call the original function
+            const result = originalDrawLeaf.apply(this, arguments);
             
-            if (pageContainer.length && pageImage.length) {
-              console.log('[OCR] Processing current page from BookReader:', currentPageIndex);
-              await processPageWithOCR(currentPageIndex, pageContainer, pageImage[0]);
-            } else {
-              console.log('[OCR] BookReader page elements not found, trying alternative approach...');
-              // Fallback: try to find any visible page image
-              const visibleImages = $('img').filter(':visible').filter(function() {
-                return this.src && this.src.includes('book');
-              });
-              if (visibleImages.length > 0) {
-                const firstImage = visibleImages.first();
-                const imageId = firstImage.attr('id');
-                const pageIndex = imageId ? parseInt(imageId.replace('page', '')) || 0 : 0;
-                const pageContainer = firstImage.parent();
-                console.log('[OCR] Processing visible image:', pageIndex);
-                await processPageWithOCR(pageIndex, pageContainer, firstImage[0]);
+            // Get the page container and image
+            const pageContainer = $(`#pagediv${index}`);
+            const pageImage = $(`#page${index}`);
+            
+            // Skip if elements not found
+            if (!pageContainer.length || !pageImage.length) return result;
+            
+            // Create or update text overlay
+            updateTextOverlay(index, pageContainer, pageImage);
+            
+            return result;
+          };
+          
+          // Update text positions on zoom/pan
+          br.bind('updateView', function() {
+            for (let i = 0; i < br.getNumLeafs(); i++) {
+              const pageContainer = $(`#pagediv${i}`);
+              const pageImage = $(`#page${i}`);
+              if (pageContainer.length && pageImage.length) {
+                updateTextOverlay(i, pageContainer, pageImage);
               }
             }
-          } else {
-            // Fallback: try to find any visible page image
-            const visibleImages = $('img').filter(':visible').filter(function() {
-              return this.src && this.src.includes('book');
-            });
-            if (visibleImages.length > 0) {
-              const firstImage = visibleImages.first();
-              const imageId = firstImage.attr('id');
-              const pageIndex = imageId ? parseInt(imageId.replace('page', '')) || 0 : 0;
-              const pageContainer = firstImage.parent();
-              console.log('[OCR] Processing visible image (fallback):', pageIndex);
-              await processPageWithOCR(pageIndex, pageContainer, firstImage[0]);
+          });
+          
+          // Handle text selection and double-click to select word
+          $(document).on('dblclick', '.BRtextOverlay', function(e) {
+            const selection = window.getSelection();
+            if (selection.toString().length > 0) {
+              // Text is already selected, don't interfere
+              return;
             }
-          }
+            
+            // Get the word under cursor on double-click
+            const range = document.caretRangeFromPoint(e.clientX, e.clientY);
+            if (range) {
+              range.expand('word');
+              selection.removeAllRanges();
+              selection.addRange(range);
+              console.log('Word selected:', selection.toString());
+            }
+          });
+          
+          // Handle text selection on mouseup
+          $(document).on('mouseup', '.BRtextOverlay', function(e) {
+            const selection = window.getSelection();
+            const selectedText = selection.toString().trim();
+            if (selectedText.length > 0) {
+              console.log('Text selected:', selectedText);
+              // You can add additional selection handling here
+            }
+          });
+          // Refresh the display to apply our changes
+          window.llgBookReader.updateIndex(window.llgBookReader.currentIndex());
         }
-
-        // Show all overlays
-        $('.BRtextOverlay').show();
-        console.log('[OCR] Text overlays shown');
-
-        button.innerHTML = '<i class="fas fa-eye-slash"></i> Hide OCR Text';
-        button.classList.add('active');
-      } else {
-        // Hide OCR text
-        $('.BRtextOverlay').hide();
-        button.innerHTML = '<i class="fas fa-eye"></i> Show OCR Text';
-        button.classList.remove('active');
-        console.log('[OCR] Text overlays hidden');
-      }
+      }, 100);
     }
-
-    // Function to update OCR toggle button visibility
-    function updateOCRToggleButton() {
-      const button = document.querySelector('.ocr-toggle-btn');
-      if (!button) {
-        console.log('[OCR] Toggle button not found, creating it...');
-        createOCRToggleButton();
-        return;
-      }
-
-      // Always show the button when we have a book loaded
-      // The button will be functional once OCR data is available
-      button.classList.remove('hidden');
-      console.log('[OCR] Toggle button is now visible');
-    }
-
-    // Function to ensure toggle button exists and is visible
-    function ensureToggleButton() {
-      let button = document.querySelector('.ocr-toggle-btn');
-      if (!button) {
-        console.log('[OCR] Creating toggle button...');
-        button = createOCRToggleButton();
-      }
-
-      if (button) {
-        button.classList.remove('hidden');
-        console.log('[OCR] Toggle button ensured visible');
-      }
-    }
-
-    // Function to load text from text file created during PDF conversion
-    async function loadTextFromFile(image, pageIndex) {
-      console.log(`[TEXT] Loading text file for page ${pageIndex}`, {
-        src: image.src,
-        imageType: typeof image,
-        imageTagName: image.tagName,
-        imageId: image.id,
-        imageClass: image.className
-      });
-
-      // Check cache first
-      const cacheKey = image.src;
-      if (textFileCache.has(cacheKey)) {
-        console.log('[TEXT] Using cached text file content for', cacheKey);
-        return textFileCache.get(cacheKey);
-      }
-
-      try {
-        // Extract book folder and image filename from the image src
-        const url = new URL(image.src);
-        const pathParts = url.pathname.split('/');
-        const bookFolder = pathParts[pathParts.length - 2];
-        const imageFileName = pathParts[pathParts.length - 1];
-
-        // Construct text file URL (same as image but with .txt extension)
-        // Handle URL encoding issues - replace %20 with spaces and decode
-        let imageUrl = image.src;
-        try {
-          // Decode URL to handle encoded characters
-          imageUrl = decodeURIComponent(imageUrl);
-        } catch (e) {
-          console.warn('[TEXT] Could not decode image URL:', imageUrl);
-        }
-        const textFileUrl = imageUrl.replace('.jpg', '.txt');
-
-        console.log('[TEXT] Loading text file from:', textFileUrl);
-
-        // Fetch the text file
-        const response = await fetch(textFileUrl);
-        if (!response.ok) {
-          console.warn(`[TEXT] Text file not found for page ${pageIndex}:`, response.status);
-          // Cache empty result to avoid repeated attempts
-          textFileCache.set(cacheKey, '');
-          return '';
-        }
-
-        const textContent = await response.text();
-        console.log(`[TEXT] Loaded text file for page ${pageIndex}, length:`, textContent.length);
-
-        // Cache the results
-        textFileCache.set(cacheKey, textContent);
-        return textContent;
-
-      } catch (error) {
-        console.error('[TEXT] Error loading text file for page', pageIndex, ':', error);
-        // Cache empty result to avoid repeated attempts
-        textFileCache.set(cacheKey, '');
-        return '';
-      }
-    }
-
-    // Function to process a single page with OCR
-    async function processPageWithOCR(pageIndex, container, image) {
-      console.log(`[OCR] Processing page ${pageIndex} with OCR...`);
-
-      // Prevent concurrent processing of the same page
-      if (processingPages.has(pageIndex)) {
-        console.log(`[OCR] Page ${pageIndex} is already being processed, skipping...`);
-        return;
-      }
-
-      // Don't retry failed pages
-      if (failedPages.has(pageIndex)) {
-        console.log(`[OCR] Page ${pageIndex} previously failed, skipping retry...`);
-        return;
-      }
-
-      // Ensure toggle button is visible when OCR starts
-      ensureToggleButton();
-
-      // Check if we already have text data for this page
-      // Check both cache formats: textFileCache Map and window.ocrCache object
-      const cacheKey = image.src || `page_${pageIndex}`;
-      let textData = null;
-
-      if (textFileCache.has(cacheKey)) {
-        textData = textFileCache.get(cacheKey);
-        console.log(`[TEXT] Using cached text data from Map for page ${pageIndex}`);
-      } else if (window.ocrCache && window.ocrCache[pageIndex] && typeof window.ocrCache[pageIndex] === 'string') {
-        textData = window.ocrCache[pageIndex];
-        console.log(`[TEXT] Using cached text data from window.ocrCache for page ${pageIndex}`);
-      }
-
-      // If we have cached data (even if empty string), use it
-      if (textData !== null && textData !== undefined) {
-        // Store in both cache formats for consistency
-        if (!textFileCache.has(cacheKey)) {
-          textFileCache.set(cacheKey, textData);
-        }
-        if (!window.ocrCache) window.ocrCache = {};
-        if (!window.ocrCache[pageIndex]) {
-          window.ocrCache[pageIndex] = textData;
-        }
-        // Update overlay without triggering new text loading
-        // Empty string is valid - means "no text found" not "not processed"
-        updateTextOverlay(pageIndex, container, image, textData);
-        return;
-      }
-
-      // Mark page as processing
-      processingPages.add(pageIndex);
-
-      // Check if image is loaded
-      if (!image.complete || image.naturalWidth === 0) {
-        console.log(`[OCR] Image not loaded yet, waiting...`);
-        await new Promise((resolve) => {
-          image.onload = () => {
-            console.log(`[OCR] Image loaded, proceeding with OCR`);
-            resolve();
-          };
-          image.onerror = () => {
-            console.error(`[OCR] Image failed to load`);
-            processingPages.delete(pageIndex);
-            failedPages.add(pageIndex);
-            resolve();
-          };
-          // Timeout after 5 seconds
-          setTimeout(() => {
-            console.log(`[OCR] Image load timeout, proceeding anyway`);
-            resolve();
-          }, 5000);
-        });
-      }
-
-      // Show loading indicator
-      const loadingId = `loading-${pageIndex}`;
-      const loadingDiv = document.createElement('div');
-      loadingDiv.id = loadingId;
-      loadingDiv.className = 'ocr-loading';
-      loadingDiv.innerHTML = `
-          <div>Processing page ${pageIndex + 1} with OCR...</div>
-      `;
-      // Use container[0] to get the DOM element from jQuery object
-      if (container[0]) {
-        container[0].appendChild(loadingDiv);
-      } else {
-        // Fallback: append to body if container is not available
-        document.body.appendChild(loadingDiv);
-      }
-
-      try {
-        console.log(`[TEXT] Loading text file for page ${pageIndex}...`);
-        const result = await loadTextFromFile(image, pageIndex);
-
-        console.log(`[TEXT] loadTextFromFile returned result for page ${pageIndex}:`, {
-          resultType: typeof result,
-          length: result ? result.length : 0,
-          preview: result ? result.substring(0, 100) + '...' : 'empty'
-        });
-
-        // Store the result in cache (both formats) - even if empty string, this is a valid result
-        const cacheKey = image.src || `page_${pageIndex}`;
-        textFileCache.set(cacheKey, result);
-        if (!window.ocrCache) window.ocrCache = {};
-        window.ocrCache[pageIndex] = result;
-
-        console.log(`[TEXT] Stored in cache - Map has ${textFileCache.size} entries, window.ocrCache[${pageIndex}] =`,
-          window.ocrCache[pageIndex] ? window.ocrCache[pageIndex].length + ' chars' : 'undefined');
-
-        console.log(`[TEXT] Text loading completed for page ${pageIndex}, found ${result.length} characters`);
-
-        // Remove from processing set - mark as processed even if 0 words
-        processingPages.delete(pageIndex);
-        console.log(`[OCR] Removed page ${pageIndex} from processing set. Remaining:`, Array.from(processingPages));
-
-        // If result is empty, mark as failed to prevent retries (but don't show error)
-        if (result.length === 0) {
-          console.log(`[OCR] Page ${pageIndex} has no text detected - this is a valid result, marking as processed`);
-          // Don't add to failedPages - just ensure we don't retry
-        }
-
-        // Update the overlay with the OCR results (pass data directly to avoid cache lookup loop)
-        // Pass empty array as valid data - it means "no text found" not "no OCR done"
-        console.log(`[OCR] Calling updateTextOverlay for page ${pageIndex} with ${result.length} words`);
-        console.log(`[OCR] Container type:`, typeof container, 'jQuery:', !!container.jquery, 'length:', container.length);
-        console.log(`[OCR] Image type:`, typeof image, 'src:', image.src);
-        updateTextOverlay(pageIndex, container, image, result);
-        console.log(`[OCR] updateTextOverlay completed for page ${pageIndex}`);
-
-        // Show the overlay if OCR text is currently visible
-        if (ocrTextVisible) {
-          const overlays = $(`.BRtextOverlay[data-page="${pageIndex}"]`);
-          console.log(`[OCR] OCR text is visible, checking overlays for page ${pageIndex}:`, overlays.length, 'found');
-          if (overlays.length > 0) {
-            overlays.show();
-            console.log(`[OCR] Showing ${overlays.length} overlay(s) for page ${pageIndex}`);
-          } else {
-            console.warn(`[OCR] Warning: Overlays created but not found for page ${pageIndex}. Searching all overlays:`, $('.BRtextOverlay').length);
-          }
-        } else {
-          console.log(`[OCR] OCR text is not visible, overlays will be shown when toggle is clicked`);
-        }
-
-        // Update toggle button visibility
-        updateOCRToggleButton();
-        console.log(`[OCR] Toggle button updated for page ${pageIndex}`);
-
-        // Remove loading indicator
-        const loadingElement = document.getElementById(loadingId);
-        if (loadingElement) {
-          loadingElement.remove();
-          console.log(`[OCR] Loading indicator removed for page ${pageIndex}`);
-        } else {
-          console.warn(`[OCR] Loading indicator not found for page ${pageIndex} (ID: ${loadingId})`);
-        }
-        
-        console.log(`[OCR] processPageWithOCR completed successfully for page ${pageIndex}`);
-
-      } catch (error) {
-        console.error('[OCR] Error in processPageWithOCR:', error);
-        console.error('[OCR] Error stack:', error.stack);
-        // Mark as failed and remove from processing
-        processingPages.delete(pageIndex);
-        failedPages.add(pageIndex);
-        console.log(`[OCR] Marked page ${pageIndex} as failed. Failed pages:`, Array.from(failedPages));
-        
-        // Remove loading indicator on error
-        const loadingElement = document.getElementById(loadingId);
-        if (loadingElement) {
-          loadingElement.remove();
-          console.log(`[OCR] Loading indicator removed after error for page ${pageIndex}`);
-        }
-      }
-    }
-
+    
     // Function to update text overlay for a page
-    function updateTextOverlay(pageIndex, container, image, providedData = null) {
-      console.log('=== ENTERING updateTextOverlay ===');
-      console.log('Parameters:', { pageIndex, container, image, providedData });
-      console.log(`Updating text overlay for page ${pageIndex}`);
-
+    function updateTextOverlay(pageIndex, container, image) {
+      console.log('=== UPDATE TEXT OVERLAY CALLED ===');
+      console.log('Page index:', pageIndex);
+      console.log('Container:', container);
+      console.log('Image:', image);
+      console.log(`[DEBUG] Updating text overlay for page ${pageIndex}`, { 
+        containerExists: !!container,
+        containerLength: container ? container.length : 0,
+        imageExists: !!image,
+        imageLength: image ? image.length : 0,
+        imageSrc: image ? image.attr('src') : null
+      });
+      
       try {
         // Remove existing overlay if it exists
-        $(`.BRtextOverlay[data-page="${pageIndex}"]`).remove();
-
-        // Get the OCR data - use provided data if available, otherwise check cache
-        let ocrData = providedData;
-        let dataFromCache = false;
+        const existingOverlay = $(`.BRtextOverlay[data-page="${pageIndex}"]`);
+        if (existingOverlay.length) {
+          console.log(`[DEBUG] Removing existing overlay for page ${pageIndex}`);
+          existingOverlay.remove();
+        }
         
-        // If providedData is explicitly null/undefined, it means we need to check cache
-        // If providedData is an empty array, it's a valid result (no text found)
-        if (providedData === null || providedData === undefined) {
-          // Check both cache formats
-          const cacheKey = image.src || `page_${pageIndex}`;
-          if (ocrCache.has(cacheKey)) {
-            ocrData = ocrCache.get(cacheKey);
-            dataFromCache = true;
-          } else if (window.ocrCache && window.ocrCache[pageIndex]) {
-            ocrData = window.ocrCache[pageIndex];
-            dataFromCache = true;
+        // Make sure we have valid elements
+        if (!container || !container.length || !image || !image.length) {
+          console.warn(`[WARN] Invalid container or image for page ${pageIndex}`, {
+            container: container ? 'exists' : 'missing',
+            image: image ? 'exists' : 'missing'
+          });
+          return;
+        }
+        
+        // Get page dimensions and position
+        const pageWidth = image.width();
+        const pageHeight = image.height();
+        
+        console.log(`[DEBUG] Page ${pageIndex} dimensions: ${pageWidth}x${pageHeight}`);
+        
+        if (!pageWidth || !pageHeight) {
+          console.warn(`[WARN] Invalid dimensions for page ${pageIndex}: ${pageWidth}x${pageHeight}`);
+          // Try again in case the image hasn't loaded yet
+          if (image[0].complete === false) {
+            console.log(`[DEBUG] Image not loaded yet, adding load handler`);
+            image.one('load', () => {
+              console.log(`[DEBUG] Image loaded, retrying overlay for page ${pageIndex}`);
+              updateTextOverlay(pageIndex, container, image);
+            });
           } else {
-            ocrData = null; // No data at all - not processed yet
-          }
-        }
-
-        // If no data found and not already processing/failed, start OCR
-        if (ocrData === null || ocrData === undefined) {
-          // Only start OCR if not already processing and not previously failed
-          if (!processingPages.has(pageIndex) && !failedPages.has(pageIndex)) {
-            console.log(`No OCR data available for page ${pageIndex}, starting OCR process...`);
-            processPageWithOCR(pageIndex, container, image);
-          } else {
-            console.log(`Skipping OCR for page ${pageIndex} - already processing or failed`);
+            console.warn(`[WARN] Image marked as complete but has no dimensions`);
           }
           return;
         }
-
-        // If ocrData is an empty string, it means no text was found
-        // This is a valid result - don't retry, just show nothing
-        if (typeof ocrData === 'string' && ocrData.trim().length === 0) {
-          console.log(`[TEXT] Page ${pageIndex} has no text to display (empty text file)`);
-          // Don't create overlay, but also don't retry
-          return;
-        }
-
-        console.log(`Found text content for page ${pageIndex}, length: ${ocrData.length}`);
-
-        // Get the actual image dimensions and position
-        // Handle both jQuery objects and DOM elements
-        const imageElement = image.jquery ? image[0] : image;
-        const containerElement = container.jquery ? container[0] : (container[0] || container);
-
-        console.log(`[OCR] DOM elements:`, {
-          imageElement: !!imageElement,
-          containerElement: !!containerElement,
-          imageId: imageElement?.id,
-          containerId: containerElement?.id,
-          containerClass: containerElement?.className,
-          imageSrc: imageElement?.src?.substring(0, 100) + '...'
-        });
-
-        if (!imageElement || !containerElement) {
-          console.error(`[OCR] Missing image or container element for page ${pageIndex}`);
-          return;
-        }
-
-        const imageRect = imageElement.getBoundingClientRect();
-        const containerRect = containerElement.getBoundingClientRect();
-
-        console.log(`[OCR] Element positions:`, {
-          imageRect: { left: imageRect.left, top: imageRect.top, width: imageRect.width, height: imageRect.height },
-          containerRect: { left: containerRect.left, top: containerRect.top, width: containerRect.width, height: containerRect.height }
-        });
-
-        // Calculate scale factors (use imageElement properties)
-        const imageNaturalWidth = imageElement.naturalWidth || imageElement.width || 1;
-        const imageNaturalHeight = imageElement.naturalHeight || imageElement.height || 1;
-        const scaleX = imageRect.width / imageNaturalWidth;
-        const scaleY = imageRect.height / imageNaturalHeight;
-
-        console.log(`[OCR] Scale factors:`, { scaleX, scaleY, naturalWidth: imageNaturalWidth, naturalHeight: imageNaturalHeight });
-
-        // Calculate image position relative to the viewport (getBoundingClientRect approach)
-        const offsetX = imageRect.left;
-        const offsetY = imageRect.top;
-
-
-
-        // Create overlay container positioned over the image (fixed position relative to viewport)
+        
+        console.log(`Page ${pageIndex} dimensions: ${pageWidth}x${pageHeight}`);
+        
+        // Create overlay container with a unique ID for debugging
+        const overlayId = 'textOverlay_' + pageIndex;
         const overlay = $('<div>', {
+          id: overlayId,
           'class': 'BRtextOverlay',
-          'data-page': pageIndex
-        }).css({
-          'position': 'fixed',
-          'top': `${imageRect.top}px`,
-          'left': `${imageRect.left}px`,
-          'width': `${imageRect.width}px`,
-          'height': `${imageRect.height}px`,
-          'z-index': '2147483647',
+          'data-page': pageIndex,
+          css: {
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            zIndex: 2147483647, // Max z-index
+            pointerEvents: 'auto'
+          }
+        });
+        
+        // Add a debug message
+        console.log('Creating overlay with ID:', overlayId);
+        
+        // Position overlay absolutely within the container
+        overlay.css({
+          position: 'absolute',
+          left: '0',
+          top: '0',
+          width: '100%',
+          height: '100%',
+          'z-index': '1000',
           'pointer-events': 'none',
           'overflow': 'visible',
-          'background-color': 'transparent'
+          'background-color': 'rgba(255, 0, 0, 0.1)' // Debug: Add semi-transparent red background
         });
-
-        // Create a single text element covering the entire page
-        console.log(`[TEXT] Creating text overlay for page ${pageIndex} with ${ocrData.length} characters`);
-
-        const textEl = $('<div>', {
-          'class': 'ocr-text',
-          'text': ocrData,
-          'data-page-index': pageIndex
-        }).css({
-          'position': 'absolute',
-          'left': '0px',
-          'top': '0px',
-          'width': '100%',
-          'height': '100%',
-          'font-size': '14px',
-          'line-height': '1.4',
-          'padding': '20px',
-          'box-sizing': 'border-box',
-          'white-space': 'pre-wrap',
-          'overflow': 'auto',
-          'background-color': 'rgba(255, 255, 255, 0.9)',
-          'color': 'rgba(0, 0, 0, 0.8)',
-          'pointer-events': 'auto',
-          'user-select': 'text',
-          '-webkit-user-select': 'text'
+        
+        console.log(`[DEBUG] Adding overlay to container`, {
+          containerId: container.attr('id'),
+          containerClass: container.attr('class')
         });
-
-        overlay.append(textEl);
-
-        console.log(`[TEXT] Finished creating text overlay for page ${pageIndex}`);
-
-        // Add the overlay to the document body since it's positioned fixed
-        document.body.appendChild(overlay[0]);
-
-        console.log(`[OCR] Overlay appended to container for page ${pageIndex}`);
-
-        // Show the overlay if OCR text is currently visible
-        if (ocrTextVisible) {
-          overlay.show();
-          console.log(`[OCR] Overlay shown for page ${pageIndex}`);
+        
+        // Ensure container has relative positioning
+        container.css('position', 'relative');
+        
+        // Add overlay to the container with a bright border for debugging
+        overlay.css('border', '2px solid #00ff00');
+        container.append(overlay);
+        console.log('Overlay added to container:', overlay);
+        
+        // Force a reflow and log the computed styles
+        setTimeout(() => {
+          const style = window.getComputedStyle(overlay[0]);
+          console.log('Overlay styles after append:', {
+            display: style.display,
+            visibility: style.visibility,
+            opacity: style.opacity,
+            position: style.position,
+            zIndex: style.zIndex,
+            width: style.width,
+            height: style.height
+          });
+        }, 100);
+        
+        console.log(`[DEBUG] Overlay added to DOM`, {
+          parent: overlay.parent().attr('id') || overlay.parent().attr('class'),
+          overlayInDOM: document.body.contains(overlay[0])
+        });
+        
+        // Get or generate text data for this page
+        if (!textLayers[pageIndex]) {
+          textLayers[pageIndex] = generateSampleTextData(pageIndex, pageWidth, pageHeight);
         }
-
-        console.log(`[OCR] Overlay added to container with ${ocrData.length} text elements for page ${pageIndex}`);
-
+        
+        // Add text spans to overlay
+        const textData = textLayers[pageIndex] || [];
+        console.log(`Adding ${textData.length} text elements to page ${pageIndex}`);
+        
+        textData.forEach((word, i) => {
+          try {
+            const span = $(`<span>${word.text}</span>`);
+            const fontSize = word.fontSize || word.height * 0.8;
+            
+            // Create span with all necessary styles
+            const spanStyle = {
+              position: 'absolute',
+              left: (word.x || 0) + 'px',
+              top: (word.y || 0) + 'px',
+              width: (word.width || 200) + 'px',
+              height: (word.height || 30) + 'px',
+              fontSize: fontSize + 'px',
+              lineHeight: (word.height || 30) + 'px',
+              transform: `scale(${word.scaleX || 1}, ${word.scaleY || 1})`,
+              transformOrigin: '0 0',
+              color: word.color || 'rgba(0, 0, 0, 0.8)',
+              backgroundColor: 'rgba(255, 255, 255, 0.7)',
+              padding: '2px 4px',
+              borderRadius: '3px',
+              border: '1px solid rgba(0, 0, 0, 0.2)',
+              pointerEvents: 'auto',
+              WebkitUserSelect: 'text',
+              MozUserSelect: 'text',
+              msUserSelect: 'text',
+              userSelect: 'text',
+              cursor: 'text',
+              zIndex: 2147483647,
+              boxSizing: 'border-box',
+              // Additional properties for better selection
+              WebkitTouchCallout: 'default',
+              WebkitUserDrag: 'none',
+              WebkitTapHighlightColor: 'transparent'
+            };
+            
+            // Apply styles with !important using direct DOM manipulation
+            const spanElement = document.createElement('span');
+            spanElement.setAttribute('unselectable', 'off');
+            
+            // Apply styles directly to the element
+            for (const [prop, value] of Object.entries(spanStyle)) {
+              // Convert camelCase to kebab-case for CSS properties
+              const cssProp = prop.replace(/[A-Z]/g, match => `-${match.toLowerCase()}`);
+              spanElement.style.setProperty(cssProp, value, 'important');
+            }
+            
+            // Set text content
+            spanElement.textContent = word.text;
+            
+            // Add to overlay
+            overlay[0].appendChild(spanElement);
+            
+            // Log for debugging
+            console.log('Added text span:', {
+              text: word.text,
+              x: word.x,
+              y: word.y,
+              element: spanElement
+            });
+            
+            overlay.append(span);
+            console.log(`Added text: "${word.text}" at (${word.x}, ${word.y})`);
+          } catch (e) {
+            console.error(`Error adding text span ${i}:`, e);
+          }
+        });
+        
+        // Force a redraw
+        overlay.hide().show(0);
+        
       } catch (e) {
         console.error('Error in updateTextOverlay:', e);
       }
     }
-
-    // Initialize BookReader when document is ready
+    
+    // Generate sample text data for demonstration
+    function generateSampleTextData(pageIndex, pageWidth, pageHeight) {
+      // Use fixed positions for the sample text
+      const words = [
+        { text: 'Sample', x: 100, y: 100, width: 120, height: 30 },
+        { text: 'Text', x: 230, y: 100, width: 80, height: 30 },
+        { text: 'Overlay', x: 320, y: 100, width: 120, height: 30 },
+        { text: 'Page ' + (pageIndex + 1), x: 100, y: 150, width: 200, height: 40, fontSize: 24 },
+        { text: 'You can select this text', x: 100, y: 200, width: 300, height: 30 },
+        { text: 'Try highlighting and copying!', x: 100, y: 250, width: 300, height: 30, color: '#0066cc' },
+        { text: 'This is a test overlay', x: 100, y: 300, width: 250, height: 30, color: '#cc0000' },
+        { text: 'Hello from BookReader!', x: 100, y: 350, width: 300, height: 30, fontSize: 20, color: '#008800' }
+      ];
+      
+      // Add some debug text to help with positioning
+      words.push({
+        text: `Page Size: ${pageWidth}x${pageHeight}`, 
+        x: 20, 
+        y: 20, 
+        width: 200, 
+        height: 20,
+        fontSize: 14,
+        color: '#666666'
+      });
+      
+      return words;
+    }
+    
+    // Function to initialize BookReader with text overlay
+    function initializeBookReader(options = {}) {
+      console.log('[DEBUG] Initializing BookReader with options:', options);
+      
+      const defaultOptions = {
+        startFullscreen: true,
+        autoFit: true,
+        ready: function() {
+          console.log('[DEBUG] BookReader ready, initializing text overlay...');
+          
+          // Store reference to BookReader instance
+          window.llgBookReader = this;
+          console.log('[DEBUG] Stored BookReader instance in window.llgBookReader');
+          
+          // Add overlay update to the page flip handler
+          const originalUpdateIndex = this.updateIndex;
+          this.updateIndex = function(index) {
+            console.log(`[DEBUG] Updating to page index: ${index}`);
+            originalUpdateIndex.call(this, index);
+            
+            // Small delay to ensure DOM is updated
+            setTimeout(() => {
+              console.log(`[DEBUG] Checking page ${index} after update`);
+              const currentView = this._models.data[this.currentIndex()];
+              console.log(`[DEBUG] Current view:`, currentView);
+              
+              if (currentView) {
+                const pageContainer = $(`#pagediv${this.currentIndex()}`);
+                const pageImage = pageContainer.find('img');
+                
+                console.log(`[DEBUG] Page container found:`, {
+                  containerExists: pageContainer.length > 0,
+                  imageExists: pageImage.length > 0,
+                  containerId: pageContainer.attr('id'),
+                  imageSrc: pageImage.attr('src')
+                });
+                
+                if (pageContainer.length && pageImage.length) {
+                  console.log(`[DEBUG] Calling updateTextOverlay for page ${this.currentIndex()}`);
+                  updateTextOverlay(this.currentIndex(), pageContainer, pageImage);
+                  
+                  // Debug: Log the container's HTML for inspection
+                  console.log(`[DEBUG] Container HTML:`, pageContainer.html());
+                } else {
+                  console.warn(`[WARN] Could not find page container or image for page ${this.currentIndex()}`);
+                }
+              }
+            }, 300); // Increased delay to ensure DOM updates
+          };
+          
+          // Initial overlay setup
+          console.log('[DEBUG] Calling initial addTextOverlay');
+          addTextOverlay();
+          
+          // Force an initial update of the view
+          if (this.updateIndex) {
+            console.log('[DEBUG] Forcing initial updateIndex call');
+            this.updateIndex(this.currentIndex());
+          } else {
+            console.error('[ERROR] updateIndex is not defined on BookReader instance');
+          }
+        },
+        // Add error handling
+        error: function(error) {
+          console.error('BookReader error:', error);
+        }
+      };
+      
+      // Merge default options with provided options
+      const finalOptions = { ...defaultOptions, ...options };
+      
+      // Initialize BookReader
+      instantiateBookReader('#BookReader', finalOptions);
+    }
+    
+    // Start the BookReader initialization
+    console.log('Starting BookReader initialization...');
+    
+    // Wait for everything to be ready
     $(document).ready(function() {
       console.log('Document ready, initializing BookReader...');
-
-      // Create OCR toggle button immediately when page loads
-      console.log('[OCR] Creating toggle button on page load...');
-      createOCRToggleButton();
-      ensureToggleButton();
-
+      
+      // Initialize BookReader with options
       try {
-        // Initialize BookReader
-        instantiateBookReader('#BookReader', {
-          startFullscreen: true,
-          autoFit: true,
-          ready: function() {
-            console.log('BookReader ready');
-
-            // Store reference to BookReader instance
-            window.llgBookReader = this;
-
-            // Override the drawLeaf function to add OCR overlay
-            const originalDrawLeaf = this.drawLeaf || function() {};
-            this.drawLeaf = function(index, leaf) {
-              console.log(`Drawing leaf ${index}`);
-
-              // Ensure toggle button is visible for any book page
-              ensureToggleButton();
-
-              // Call the original function
-              const result = originalDrawLeaf.apply(this, arguments);
-
-              // Get the page container and image
-              const pageContainer = $(`#pagediv${index}`);
-              const pageImage = $(`#page${index}`);
-
+        const br = initializeBookReader({
+          reduce: 1,
+          // Force single page mode to make it easier to target elements
+          defaults: 'single',
+          // Disable some features that might interfere
+          enableSearch: false,
+          enablePageTurner: false,
+          // Make sure we can access the instance
+          ui: 'full',
+          // Add a callback when the page changes
+          pageChangeCallback: function(index) {
+            console.log('Page changed to:', index);
+            // Small delay to ensure DOM is updated
+            setTimeout(function() {
+              const pageContainer = $('#BookReader').find('.BRpagecontainer').first();
+              const pageImage = pageContainer.find('img').first();
               if (pageContainer.length && pageImage.length) {
-                // Check if we need to process this page
-                // Distinguish between undefined (not processed) and empty array (processed, no text)
-                const hasCache = window.ocrCache && window.ocrCache[index] !== undefined;
-                const needsProcessing = !hasCache && !processingPages.has(index) && !failedPages.has(index);
-
-                if (needsProcessing && !pageImage.hasClass('processing-ocr')) {
-                  console.log(`Starting OCR for page ${index}`);
-                  pageImage.addClass('processing-ocr');
-
-                  // Small delay to ensure the image is fully rendered
-                  setTimeout(() => {
-                    processPageWithOCR(index, pageContainer, pageImage[0])
-                      .catch(error => {
-                        console.error(`Error in OCR for page ${index}:`, error);
-                        pageImage.removeClass('processing-ocr');
-                      });
-                  }, 100);
-                } else if (hasCache) {
-                  // Update with existing data (even if empty array - means processed but no text)
-                  console.log(`Using cached OCR data for page ${index}`);
-                  updateTextOverlay(index, pageContainer, pageImage[0], window.ocrCache[index]);
-                  // Show overlay if OCR text is visible and there's data
-                  if (ocrTextVisible && window.ocrCache[index] && window.ocrCache[index].length > 0) {
-                    $(`.BRtextOverlay[data-page="${index}"]`).show();
-                  }
-                }
+                console.log('Found page container and image, updating overlay...');
+                updateTextOverlay(index, pageContainer, pageImage);
+              } else {
+                console.warn('Could not find page container or image');
               }
-
-              return result;
-            };
-
-            // Ensure OCR toggle button is visible
-            ensureToggleButton();
-
-            // Listen for page changes to update OCR overlays
-            const originalNext = this.next || function() {};
-            const originalPrev = this.prev || function() {};
-            
-            this.next = function() {
-              const result = originalNext.apply(this, arguments);
-              setTimeout(() => {
-                const newIndex = this.currentIndex();
-                if (ocrTextVisible) {
-                  const pageContainer = $(`#pagediv${newIndex}`);
-                  const pageImage = $(`#page${newIndex}`);
-                  if (pageContainer.length && pageImage.length) {
-                    if (!window.ocrCache || !window.ocrCache[newIndex]) {
-                      processPageWithOCR(newIndex, pageContainer, pageImage[0]).then(() => {
-                        $('.BRtextOverlay').show();
-                      });
-                    } else {
-                      updateTextOverlay(newIndex, pageContainer, pageImage[0]);
-                      $('.BRtextOverlay').show();
-                    }
-                  }
-                }
-              }, 100);
-              return result;
-            };
-            
-            this.prev = function() {
-              const result = originalPrev.apply(this, arguments);
-              setTimeout(() => {
-                const newIndex = this.currentIndex();
-                if (ocrTextVisible) {
-                  const pageContainer = $(`#pagediv${newIndex}`);
-                  const pageImage = $(`#page${newIndex}`);
-                  if (pageContainer.length && pageImage.length) {
-                    if (!window.ocrCache || !window.ocrCache[newIndex]) {
-                      processPageWithOCR(newIndex, pageContainer, pageImage[0]).then(() => {
-                        $('.BRtextOverlay').show();
-                      });
-                    } else {
-                      updateTextOverlay(newIndex, pageContainer, pageImage[0]);
-                      $('.BRtextOverlay').show();
-                    }
-                  }
-                }
-              }, 100);
-              return result;
-            };
-
-            // Initialize OCR for the current page
-            setTimeout(() => {
-              const currentIndex = this.currentIndex();
-              const pageContainer = $(`#pagediv${currentIndex}`);
-              const pageImage = $(`#page${currentIndex}`);
-
-              if (pageContainer.length && pageImage.length) {
-                processPageWithOCR(currentIndex, pageContainer, pageImage[0]);
-              }
-            }, 1000);
-          },
-          error: function(error) {
-            console.error('BookReader error:', error);
+            }, 100);
           }
         });
-
+        
+        // Store the BookReader instance globally
+        window.llgBookReader = br;
+        
       } catch (e) {
         console.error('Error initializing BookReader:', e);
       }

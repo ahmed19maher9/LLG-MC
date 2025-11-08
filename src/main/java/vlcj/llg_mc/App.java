@@ -1,29 +1,5 @@
 package vlcj.llg_mc;
 
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import java.util.zip.GZIPInputStream;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.CompletableFuture;
-import java.util.stream.Stream;
-import java.util.Comparator;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import javafx.application.Platform;
-import javafx.embed.swing.JFXPanel;
-import javafx.scene.web.WebEngine;
-import javafx.scene.web.WebView;
-import javafx.scene.Scene;
-import javafx.concurrent.Worker;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import java.util.stream.Collectors;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Locale;
-import netscape.javascript.JSObject;
-
 import java.awt.AlphaComposite;
 import java.awt.BasicStroke;
 import java.awt.BorderLayout;
@@ -84,13 +60,28 @@ import java.nio.file.WatchEvent;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
+import java.text.CharacterIterator;
+import java.text.SimpleDateFormat;
+import java.text.StringCharacterIterator;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.zip.GZIPInputStream;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -116,6 +107,7 @@ import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.JTextPane;
 import javax.swing.JViewport;
+import javax.swing.JWindow;
 import javax.swing.KeyStroke;
 import javax.swing.ListCellRenderer;
 import javax.swing.ListSelectionModel;
@@ -134,10 +126,20 @@ import javax.swing.text.StyledDocument;
 import javax.swing.text.html.HTMLEditorKit;
 import javax.swing.text.html.StyleSheet;
 
-import com.frostwire.jlibtorrent.TorrentHandle;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
+import javafx.application.Platform;
+import javafx.concurrent.Worker;
+import javafx.embed.swing.JFXPanel;
+import javafx.scene.Scene;
+import javafx.scene.input.Dragboard;
+import javafx.scene.input.TransferMode;
+import javafx.scene.web.WebEngine;
+import javafx.scene.web.WebView;
+import netscape.javascript.JSObject;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
 import okhttp3.Response;
 import uk.co.caprica.vlcj.media.InfoApi;
 import uk.co.caprica.vlcj.media.Media;
@@ -150,7 +152,6 @@ import uk.co.caprica.vlcj.player.base.MediaPlayerEventAdapter;
 import uk.co.caprica.vlcj.player.component.EmbeddedMediaListPlayerComponent;
 import uk.co.caprica.vlcj.player.component.EmbeddedMediaPlayerComponent;
 import uk.co.caprica.vlcj.player.embedded.fullscreen.adaptive.AdaptiveFullScreenStrategy;
-import java.util.logging.Level;
 import uk.co.caprica.vlcj.player.list.ListApi;
 import uk.co.caprica.vlcj.player.list.MediaListPlayer;
 import uk.co.caprica.vlcj.player.list.MediaListPlayerEventAdapter;
@@ -162,7 +163,6 @@ import vlcj.llg_mc.util.PdfUtils;
  */
 
 public class App extends JFrame {
-
 	private static final Logger LOGGER = Logger.getLogger(App.class.getName());
 
 	private static EmbeddedMediaListPlayerComponent mediaPlayerListComponent;
@@ -188,6 +188,8 @@ public class App extends JFrame {
 	private static final Color BRAND_ACCENT = new Color(249, 115, 22);
 	private static final Color TEXT_PRIMARY = new Color(241, 245, 249);
 	private static final Color TEXT_SECONDARY = new Color(203, 213, 225); // Slightly muted version of TEXT_PRIMARY
+	private static final Color GLASS_BACKGROUND = new Color(255, 255, 255, 90);
+	private static final Color GLASS_STROKE = new Color(255, 255, 255, 140);
 	private static final Color PANEL_OVERLAY = new Color(15, 23, 42, 140);
 	private static Image backgroundImage;
 	private static Image scaledBackgroundImage;
@@ -195,6 +197,7 @@ public class App extends JFrame {
 	private static int scaledBackgroundHeight;
 	private static double ambientPhase;
 	private static Timer ambientTimer;
+	private static JButton taskbarButton;
 	private static JButton readAloudButton;
 	private static JPanel taskbarButtonsPanel;
 	private static JProgressBar pdfConversionProgressBar;
@@ -210,12 +213,16 @@ public class App extends JFrame {
 	private static boolean savedFrameResizable;
 	private static boolean savedFrameUndecorated;
 	private static boolean savedFrameAlwaysOnTop;
-	private static File pendingMediaFile;
+	private static JWindow fullscreenWindow;
+	private static Rectangle savedBookReaderBounds;
+	private static int savedBookReaderExtendedState = Frame.NORMAL;
+	private static boolean savedBookReaderResizable;
+	private static boolean savedBookReaderUndecorated;
+	private static boolean savedBookReaderAlwaysOnTop;
 
 	// PDF related variables
+	private static final String TEMP_IMAGE_DIR = System.getProperty("java.io.tmpdir") + "/llg-mc/pdf-images";
 	private static final int PDF_IMAGE_DPI = 150; // DPI for PDF to image conversion
-	private static Path BOOKS_BASE_DIR;
-	private static Path RUNTIME_BOOKS_DIR;
 	private static final Set<String> BOOK_IMAGE_EXTENSIONS = Set.of(".jpg", ".jpeg", ".png", ".webp", ".gif");
 
 	// Card layout for managing different views
@@ -243,8 +250,14 @@ public class App extends JFrame {
 	private static JFXPanel goMoviesPanel;
 	private static JPanel torrentMediaPanel;
 	private static JPanel taskbarPanel;
+	private static WebEngine youtubeEngine;
+	private static volatile boolean youtubeReady;
 	private static JButton youtubeLyricsButton;
+	private static WebEngine vimeoEngine;
+	private static volatile boolean vimeoReady;
 	private static JButton vimeoLyricsButton;
+	private static WebEngine goMoviesEngine;
+	private static volatile boolean goMoviesReady;
 	private static JButton goMoviesLyricsButton;
 	private static EmbeddedMediaPlayerComponent torrentMediaPlayer;
 	private static JTextField torrentMagnetField;
@@ -254,14 +267,6 @@ public class App extends JFrame {
 	private static JList<TorrentFileEntry> torrentFileList;
 	private static String selectedTorrentEntryPath;
 	private static volatile TorrentFileEntry currentlyDownloadingEntry = null;
-
-	// WebView related fields
-	private static WebEngine youtubeEngine;
-	private static volatile boolean youtubeReady = false;
-	private static WebEngine vimeoEngine;
-	private static volatile boolean vimeoReady = false;
-	private static WebEngine goMoviesEngine;
-	private static volatile boolean goMoviesReady = false;
 	private static final AtomicBoolean javafxRuntimeInitialized = new AtomicBoolean(false);
 	private static boolean torrentLandingAutoStarted = false;
 	private static final String DEFAULT_DEMO_MAGNET = "magnet:?xt=urn:btih:08ada5a7a6183aae1e09d831df6748d566095a10&dn=Big%20Buck%20Bunny";
@@ -318,7 +323,7 @@ public class App extends JFrame {
 		pdfConversionStatusLabel.setVisible(false);
 	}
 
-	private static final Map<String, List<TorrentFileEntry>> torrentMetadataCache = new java.util.concurrent.ConcurrentHashMap<>();
+	private static final Map<String, List<TorrentFileEntry>> torrentMetadataCache = null;
 	private static final List<String> TORRENT_METADATA_ENDPOINTS = List.of("https://itorrents.org/torrent/%s.torrent",
 			"https://torrage.info/torrent/%s.torrent", "https://btcache.me/torrent/%s.torrent");
 	private static final String[] SIZE_UNITS = { "B", "KB", "MB", "GB", "TB", "PB", "EB" };
@@ -479,6 +484,16 @@ public class App extends JFrame {
 		return String.format(Locale.ENGLISH, "%.1f %s", value, SIZE_UNITS[unitIndex]);
 	}
 
+	private static CompletableFuture<List<TorrentFileEntry>> fetchTorrentMetadataAsync(String magnet) {
+		return CompletableFuture.supplyAsync(() -> {
+			try {
+				return fetchTorrentMetadata(magnet);
+			} catch (IOException e) {
+				throw new CompletionException(e);
+			}
+		});
+	}
+
 	private static void styleToolbarButton(JButton button) {
 		button.setFocusPainted(false);
 		button.setContentAreaFilled(false);
@@ -514,14 +529,28 @@ public class App extends JFrame {
 		});
 	}
 
+	private static Path getBooksBaseDir() {
+		String appPathProp = System.getProperty("jpackage.app-path");
+		if (appPathProp != null) {
+			// Running as installed app
+			Path appDir = Paths.get(appPathProp).getParent();
+			if (appDir != null) {
+				return appDir.resolve("app").resolve("classes").resolve("bookreader").resolve("books");
+			}
+		}
+		// Running in development
+		return Paths.get("src", "main", "resources", "bookreader", "books");
+	}
+
 	private static void startBooksDirectoryWatcher() {
 		if (!booksWatcherRunning.compareAndSet(false, true)) {
 			return;
 		}
 		try {
-			Files.createDirectories(BOOKS_BASE_DIR);
+			Path booksDir = getBooksBaseDir();
+			Files.createDirectories(booksDir);
 			booksWatchService = FileSystems.getDefault().newWatchService();
-			BOOKS_BASE_DIR.register(booksWatchService, StandardWatchEventKinds.ENTRY_CREATE,
+			booksDir.register(booksWatchService, StandardWatchEventKinds.ENTRY_CREATE,
 					StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_MODIFY);
 		} catch (IOException e) {
 			booksWatcherRunning.set(false);
@@ -636,8 +665,8 @@ public class App extends JFrame {
 		}
 		cleaned = cleaned.trim();
 		if (cleaned.length() == 40 && isHex(cleaned))
-			return cleaned.toLowerCase(Locale.getDefault());
-		String upper = cleaned.toUpperCase(Locale.getDefault());
+			return cleaned.toLowerCase(Locale.ROOT);
+		String upper = cleaned.toUpperCase(Locale.ROOT);
 		if (upper.length() == 32 && isBase32(upper)) {
 			byte[] decoded = decodeBase32(upper);
 			if (decoded != null && decoded.length == 20)
@@ -849,8 +878,6 @@ public class App extends JFrame {
 		JPanel container = new JPanel(new BorderLayout());
 		container.setOpaque(false);
 
-		// Note: LibtorrentStreamer initialization is handled in openTorrentView()
-
 		// Create main controls panel with GridBagLayout
 		JPanel controls = createGlassPanel(new GridBagLayout());
 		controls.setOpaque(false);
@@ -888,30 +915,19 @@ public class App extends JFrame {
 		gbc.gridy = 1;
 		controls.add(magnetLabel, gbc);
 
-		torrentMagnetField = new JTextField(30);
-		torrentMagnetField.setOpaque(false);
-		torrentMagnetField.setBorder(BorderFactory.createMatteBorder(0, 0, 2, 0, BRAND_PRIMARY));
-		torrentMagnetField.setToolTipText("Paste magnet link here");
+		JTextField magnetField = new JTextField(30);
+		magnetField.setOpaque(false);
+		magnetField.setBorder(BorderFactory.createMatteBorder(0, 0, 2, 0, BRAND_PRIMARY));
+		magnetField.setToolTipText("Paste magnet link here");
 		gbc.gridx = 1;
 		gbc.weightx = 1.0;
 		gbc.fill = GridBagConstraints.HORIZONTAL;
-		controls.add(torrentMagnetField, gbc);
+		controls.add(magnetField, gbc);
 
 		JButton loadMagnetButton = new JButton("Load");
 		loadMagnetButton.addActionListener(e -> {
-			String magnetLink = torrentMagnetField.getText().trim();
+			String magnetLink = magnetField.getText().trim();
 			if (!magnetLink.isEmpty()) {
-				// Ensure libtorrentStreamer is initialized before loading
-				if (libtorrentStreamer == null) {
-					// Initialize torrent view components if not already done
-					if (torrentView == null) {
-						torrentView = buildTorrentView();
-					}
-					// Initialize the streamer with proper UI components
-					JSplitPane splitPane = (JSplitPane) torrentView.getComponent(1);
-					JPanel contentPanel = (JPanel) splitPane.getLeftComponent();
-					libtorrentStreamer = new LibtorrentStreamer(frame, contentPanel, torrentMediaPanel);
-				}
 				loadTorrentFromMagnet(magnetLink);
 			} else {
 				JOptionPane.showMessageDialog(frame, "Please enter a magnet link", "Error",
@@ -925,18 +941,7 @@ public class App extends JFrame {
 		// Add demo magnet button
 		JButton demoMagnetButton = new JButton("Load Demo");
 		demoMagnetButton.addActionListener(e -> {
-			torrentMagnetField.setText(DEFAULT_DEMO_MAGNET);
-			// Ensure libtorrentStreamer is initialized before loading
-			if (libtorrentStreamer == null) {
-				// Initialize torrent view components if not already done
-				if (torrentView == null) {
-					torrentView = buildTorrentView();
-				}
-				// Initialize the streamer with proper UI components
-				JSplitPane splitPane = (JSplitPane) torrentView.getComponent(1);
-				JPanel contentPanel = (JPanel) splitPane.getLeftComponent();
-				libtorrentStreamer = new LibtorrentStreamer(frame, contentPanel, torrentMediaPanel);
-			}
+			magnetField.setText(DEFAULT_DEMO_MAGNET);
 			loadTorrentFromMagnet(DEFAULT_DEMO_MAGNET);
 		});
 		styleTorrentButton(demoMagnetButton);
@@ -945,8 +950,8 @@ public class App extends JFrame {
 
 		// Add controls to container
 		container.add(controls, BorderLayout.NORTH);
-
-		// Create torrent selection panel (left side)
+		JPanel contentPanel = new JPanel(new BorderLayout(12, 0));
+		contentPanel.setOpaque(false);
 		torrentFileListModel = new DefaultListModel<>();
 		torrentFileList = new JList<>(torrentFileListModel) {
 			@Override
@@ -976,46 +981,13 @@ public class App extends JFrame {
 
 						// On double-click, check if we have a torrent loaded before playing
 						if (e.getClickCount() == 2 && selected != null) {
-							// Check if torrent is loaded and has metadata
-							if (libtorrentStreamer == null) {
+							if (libtorrentStreamer == null || libtorrentStreamer.getValidTorrentHandle() == null) {
 								JOptionPane.showMessageDialog(frame,
-										"Torrent system not initialized. Please restart the application.",
-										"Initialization Error",
-										JOptionPane.ERROR_MESSAGE);
-								return;
-							}
-
-							TorrentHandle handle = libtorrentStreamer.getValidTorrentHandle();
-							if (handle == null) {
-								// Check if this is magnet link metadata (no actual torrent session)
-								if (isMagnetLink && !torrentFileListModel.isEmpty()) {
-									JOptionPane.showMessageDialog(frame,
-											"This is magnet link metadata preview.\n\n" +
-													"To actually download and stream torrent files, you need to:\n" +
-													"1. Find the .torrent file from a torrent site\n" +
-													"2. Use the 'Browse' button to load the .torrent file\n" +
-													"3. Then double-click files to stream them\n\n" +
-													"Magnet links are currently used only for previewing torrent contents.",
-											"Magnet Link Limitation",
-											JOptionPane.INFORMATION_MESSAGE);
-								} else {
-									JOptionPane.showMessageDialog(frame,
-											"Please load a torrent file or magnet link first.",
-											"No Torrent Loaded",
-											JOptionPane.INFORMATION_MESSAGE);
-								}
-								return;
-							}
-
-							// Check if torrent has metadata (needed for file access)
-							if (!handle.status().hasMetadata()) {
-								JOptionPane.showMessageDialog(frame,
-										"Torrent metadata is still loading. Please wait a moment and try again.",
-										"Metadata Loading",
+										"Please load a torrent file or magnet link first.",
+										"No Torrent Loaded",
 										JOptionPane.INFORMATION_MESSAGE);
 								return;
 							}
-
 							playSelectedTorrentFile(selected);
 						}
 					}
@@ -1034,31 +1006,14 @@ public class App extends JFrame {
 		torrentContentsLabel.setBorder(BorderFactory.createEmptyBorder(8, 12, 4, 12));
 		torrentSelectionPanel.add(torrentContentsLabel, BorderLayout.NORTH);
 		torrentSelectionPanel.add(torrentFileScroll, BorderLayout.CENTER);
-
-		// Create media panel (right side)
-		torrentMediaPlayer = new EmbeddedMediaPlayerComponent();
+		torrentSelectionPanel.setPreferredSize(new Dimension(320, 0));
+		contentPanel.add(torrentSelectionPanel, BorderLayout.WEST);
+		String[] vlcArgs = { "--no-plugins-cache", // Prevents the stale cache error itself
+				"--quiet", // Suppresses most log messages
+				"--verbose=1" // Sets verbosity level (0=silent, 1=errors/warnings, 2=normal, 3=debug)
+		};
+		torrentMediaPlayer = new EmbeddedMediaPlayerComponent(vlcArgs);
 		torrentMediaPlayer.mediaPlayer().events().addMediaPlayerEventListener(new MediaPlayerEventAdapter() {
-			@Override
-			public void mediaChanged(MediaPlayer mediaPlayer, MediaRef media) {
-				// Stop default video when torrent media starts playing
-				if (media != null) {
-					try {
-						uk.co.caprica.vlcj.media.Media mediaInstance = media.newMedia();
-						String mrl = mediaInstance.info().mrl();
-						mediaInstance.release();
-
-						// If this is not the default video, stop the default video
-						String defaultVideoUrl = "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4";
-						if (mrl != null && !mrl.equals(defaultVideoUrl)) {
-							// This is torrent media, stop the default video
-							SwingUtilities.invokeLater(() -> updateStatus("Torrent streaming started"));
-						}
-					} catch (Exception e) {
-						LOGGER.log(Level.WARNING, "Error checking media change: " + e.getMessage(), e);
-					}
-				}
-			}
-
 			@Override
 			public void positionChanged(MediaPlayer mediaPlayer, float newPosition) {
 				if (currentlyDownloadingEntry != null) {
@@ -1073,8 +1028,6 @@ public class App extends JFrame {
 			public void finished(MediaPlayer mediaPlayer) {
 				SwingUtilities.invokeLater(() -> {
 					updateStatus("Torrent playback finished");
-					// When torrent playback finishes, open streaming link if no torrent is loaded
-					openStreamingLinkIfNoTorrent();
 				});
 			}
 
@@ -1082,160 +1035,15 @@ public class App extends JFrame {
 			public void error(MediaPlayer mediaPlayer) {
 				SwingUtilities.invokeLater(() -> {
 					updateStatus("Torrent playback error");
-					// On error, open streaming link if no torrent is loaded
-					openStreamingLinkIfNoTorrent();
 				});
 			}
 		});
-		// Create media controls panel
-		JPanel torrentControlsPanel = createGlassPanel(new FlowLayout(FlowLayout.CENTER, 5, 2));
-		torrentControlsPanel.setOpaque(false);
-		torrentControlsPanel.setBorder(BorderFactory.createEmptyBorder(2, 2, 2, 2));
-
-		JButton torrentPlayButton = new JButton("▶");
-		JButton torrentPauseButton = new JButton("⏸");
-		JButton torrentStopButton = new JButton("⏹");
-		JButton torrentSkipForwardButton = new JButton("⏭");
-		JButton torrentSkipBackButton = new JButton("⏮");
-
-		// Style the buttons
-		JButton[] controlButtons = { torrentPlayButton, torrentPauseButton, torrentStopButton, torrentSkipForwardButton,
-				torrentSkipBackButton };
-		for (JButton btn : controlButtons) {
-			btn.setFocusPainted(false);
-			btn.setContentAreaFilled(false);
-			btn.setBorder(BorderFactory.createEmptyBorder(2, 4, 2, 4));
-			btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-			btn.setFont(btn.getFont().deriveFont(Font.BOLD, 12f));
-			btn.setForeground(TEXT_PRIMARY);
-		}
-
-		// Add button actions
-		torrentPlayButton.addActionListener(e -> {
-			try {
-				if (torrentMediaPlayer != null && torrentMediaPlayer.mediaPlayer() != null) {
-					torrentMediaPlayer.mediaPlayer().controls().play();
-					updateStatus("Playing torrent media");
-				}
-			} catch (Exception ex) {
-				LOGGER.log(Level.WARNING, "Error playing torrent media: " + ex.getMessage(), ex);
-			}
-		});
-
-		torrentPauseButton.addActionListener(e -> {
-			try {
-				if (torrentMediaPlayer != null && torrentMediaPlayer.mediaPlayer() != null) {
-					if (torrentMediaPlayer.mediaPlayer().status().isPlaying()) {
-						torrentMediaPlayer.mediaPlayer().controls().pause();
-						torrentPauseButton.setText("▶");
-					} else {
-						torrentMediaPlayer.mediaPlayer().controls().play();
-						torrentPauseButton.setText("⏸");
-					}
-				}
-			} catch (Exception ex) {
-				LOGGER.log(Level.WARNING, "Error controlling torrent playback: " + ex.getMessage(), ex);
-			}
-		});
-
-		torrentStopButton.addActionListener(e -> {
-			try {
-				if (torrentMediaPlayer != null && torrentMediaPlayer.mediaPlayer() != null) {
-					torrentMediaPlayer.mediaPlayer().controls().stop();
-					updateStatus("Torrent playback stopped");
-				}
-			} catch (Exception ex) {
-				LOGGER.log(Level.WARNING, "Error stopping torrent media: " + ex.getMessage(), ex);
-			}
-		});
-
-		torrentSkipForwardButton.addActionListener(e -> {
-			try {
-				if (torrentMediaPlayer != null && torrentMediaPlayer.mediaPlayer() != null) {
-					torrentMediaPlayer.mediaPlayer().controls().skipTime(SKIP_MS);
-					updateStatus("Skipped forward " + (SKIP_MS / 1000) + " seconds");
-				}
-			} catch (Exception ex) {
-				LOGGER.log(Level.WARNING, "Error skipping forward: " + ex.getMessage(), ex);
-			}
-		});
-
-		torrentSkipBackButton.addActionListener(e -> {
-			try {
-				if (torrentMediaPlayer != null && torrentMediaPlayer.mediaPlayer() != null) {
-					torrentMediaPlayer.mediaPlayer().controls().skipTime(-SKIP_MS);
-					updateStatus("Skipped back " + (SKIP_MS / 1000) + " seconds");
-				}
-			} catch (Exception ex) {
-				LOGGER.log(Level.WARNING, "Error skipping back: " + ex.getMessage(), ex);
-			}
-		});
-
-		// Add buttons to controls panel
-		torrentControlsPanel.add(torrentSkipBackButton);
-		torrentControlsPanel.add(torrentPlayButton);
-		torrentControlsPanel.add(torrentPauseButton);
-		torrentControlsPanel.add(torrentStopButton);
-		torrentControlsPanel.add(torrentSkipForwardButton);
-
 		torrentMediaPanel = new JPanel(new BorderLayout());
 		torrentMediaPanel.setOpaque(false);
 		torrentMediaPanel.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
 		torrentMediaPanel.add(torrentMediaPlayer, BorderLayout.CENTER);
-		torrentMediaPanel.add(torrentControlsPanel, BorderLayout.SOUTH);
-
-		// Create TV-like frame around the media panel
-		JPanel tvFramePanel = new JPanel(new BorderLayout()) {
-			@Override
-			protected void paintComponent(Graphics g) {
-				super.paintComponent(g);
-				Graphics2D g2 = (Graphics2D) g.create();
-				g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-				int width = getWidth();
-				int height = getHeight();
-				int borderWidth = 8;
-				int cornerRadius = 20;
-
-				// Draw outer dark border (TV bezel)
-				g2.setColor(new Color(20, 20, 20));
-				g2.fillRoundRect(0, 0, width, height, cornerRadius, cornerRadius);
-
-				// Draw inner shadow/border
-				g2.setColor(new Color(40, 40, 40));
-				g2.fillRoundRect(borderWidth / 2, borderWidth / 2, width - borderWidth, height - borderWidth,
-						cornerRadius - 5, cornerRadius - 5);
-
-				// Draw screen area (slightly inset)
-				g2.setColor(new Color(10, 10, 10));
-				g2.fillRoundRect(borderWidth, borderWidth, width - 2 * borderWidth, height - 2 * borderWidth,
-						cornerRadius - 10, cornerRadius - 10);
-
-				// Draw subtle inner highlight
-				g2.setColor(new Color(30, 30, 30));
-				g2.drawRoundRect(borderWidth + 2, borderWidth + 2, width - 2 * borderWidth - 4,
-						height - 2 * borderWidth - 4, cornerRadius - 12, cornerRadius - 12);
-
-				g2.dispose();
-			}
-		};
-		tvFramePanel.setOpaque(false);
-		tvFramePanel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
-		tvFramePanel.add(torrentMediaPanel, BorderLayout.CENTER);
-
-		// Create JSplitPane for resizable panels (like media player view)
-		final JSplitPane mainSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, torrentSelectionPanel, tvFramePanel);
-		// Allow either pane to fully expand/collapse by setting minimum sizes to 0
-		torrentSelectionPanel.setMinimumSize(new Dimension(0, 0));
-		tvFramePanel.setMinimumSize(new Dimension(0, 0));
-		mainSplit.setResizeWeight(0.0); // Give more space to the media panel (right side)
-		mainSplit.setContinuousLayout(true);
-		mainSplit.setOneTouchExpandable(true);
-		int panelWidth = 400; // Define the desired width for the torrent selection panel
-		int initialDivider = Math.max(320, FRAME_WIDTH - panelWidth); // Initial position similar to media player
-		mainSplit.setDividerLocation(initialDivider);
-
-		container.add(mainSplit, BorderLayout.CENTER);
+		contentPanel.add(torrentMediaPanel, BorderLayout.CENTER);
+		container.add(contentPanel, BorderLayout.CENTER);
 		return container;
 	}
 
@@ -1259,48 +1067,20 @@ public class App extends JFrame {
 			return;
 		torrentFileListModel.clear();
 		selectedTorrentEntryPath = null;
-		isMagnetLink = false; // This is actual torrent file data, not magnet metadata
 		if (torrentPath == null)
 			return;
 		updateStatus("Loading torrent contents...");
 
+		// Initialize libtorrentStreamer if not already done
+		if (libtorrentStreamer == null) {
+			libtorrentStreamer = new LibtorrentStreamer();
+		}
+
 		// Load the torrent file in a background thread
 		new Thread(() -> {
 			try {
-				// Ensure libtorrentStreamer is initialized with proper UI components
-				if (libtorrentStreamer == null) {
-					// Initialize torrent view components if not already done
-					if (torrentView == null) {
-						torrentView = buildTorrentView();
-					}
-					// Initialize the streamer with proper UI components
-					JSplitPane splitPane = (JSplitPane) torrentView.getComponent(1);
-					JPanel contentPanel = (JPanel) splitPane.getLeftComponent();
-					libtorrentStreamer = new LibtorrentStreamer(frame, contentPanel, torrentMediaPanel);
-				}
-
-				// Load the torrent file - this will load it into the session
+				// Load the torrent file
 				libtorrentStreamer.loadTorrentFile(torrentPath.toFile());
-
-				// Wait for metadata to be available (up to 30 seconds)
-				int attempts = 0;
-				final int MAX_ATTEMPTS = 30; // 30 seconds total wait time
-
-				while (attempts < MAX_ATTEMPTS) {
-					try {
-						Thread.sleep(1000);
-						attempts++;
-
-						// Check if we have a valid torrent handle with metadata
-						TorrentHandle handle = libtorrentStreamer.getValidTorrentHandle();
-						if (handle != null && handle.status().hasMetadata()) {
-							break; // Metadata is ready
-						}
-					} catch (InterruptedException e) {
-						Thread.currentThread().interrupt();
-						break;
-					}
-				}
 
 				// Get the list of files from the torrent
 				List<TorrentFileEntry> entries = parseTorrentFiles(Files.readAllBytes(torrentPath));
@@ -1322,14 +1102,7 @@ public class App extends JFrame {
 					torrentFileList.setSelectedIndex(0);
 					TorrentFileEntry selected = torrentFileList.getSelectedValue();
 					selectedTorrentEntryPath = selected == null ? null : selected.getPath();
-
-					// Check if torrent is actually loaded
-					TorrentHandle handle = libtorrentStreamer.getValidTorrentHandle();
-					if (handle != null && handle.status().hasMetadata()) {
-						updateStatus("Torrent loaded successfully - double-click files to stream");
-					} else {
-						updateStatus("Torrent loaded but metadata still loading - please wait...");
-					}
+					updateStatus("Select a torrent file to stream");
 				});
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -1886,28 +1659,99 @@ public class App extends JFrame {
 		statusLabel.setText(text == null || text.isBlank() ? "Ready" : text);
 	}
 
-	private static void initializeYouTubeScene() {
-		if (youtubePanel == null) {
-			return;
+	private static java.util.List<String> collectStartupMedia(String[] args, java.io.File baseDir) {
+		java.util.List<String> result = new java.util.ArrayList<>();
+		if (args == null || args.length == 0)
+			return result;
+		for (String arg : args) {
+			if (arg == null)
+				continue;
+			String candidate = arg.trim();
+			if (candidate.isEmpty())
+				continue;
+			try {
+				if (candidate.startsWith("file:/")) {
+					java.nio.file.Path p = java.nio.file.Paths.get(java.net.URI.create(candidate));
+					candidate = p.toAbsolutePath().toString();
+				}
+			} catch (Exception ignore) {
+			}
+			java.io.File file = new java.io.File(candidate);
+			if (!file.isAbsolute() && baseDir != null) {
+				file = new java.io.File(baseDir, candidate);
+			}
+			if (file.exists()) {
+				result.add(file.getAbsolutePath());
+			} else if (candidate.contains("://")) {
+				result.add(candidate);
+			}
 		}
+		return result;
+	}
+
+	private static void enqueueStartupMedia(java.util.List<String> mediaPaths) {
+		if (mediaPaths == null || mediaPaths.isEmpty())
+			return;
+		SwingUtilities.invokeLater(() -> {
+			if (mediaPlayerListComponent == null || playlistModel == null || playlistView == null)
+				return;
+			openMediaPlayerWindow();
+			int lastIndex = -1;
+			String lastPlayable = null;
+			for (String path : mediaPaths) {
+				if (path == null || path.isBlank())
+					continue;
+				String normalized = normalizeMrl(path);
+				if (!isUsableMediaKey(normalized)) {
+					java.io.File f = new java.io.File(path);
+					if (f.exists()) {
+						normalized = f.getAbsolutePath();
+					}
+				}
+				if (!isUsableMediaKey(normalized))
+					continue;
+				mediaPlayerListComponent.mediaListPlayer().list().media().add(normalized);
+				String displayName = normalized;
+				try {
+					java.io.File displayFile = new java.io.File(normalized);
+					if (displayFile.exists()) {
+						displayName = displayFile.getName();
+					}
+				} catch (Exception ignore) {
+				}
+				playlistModel.addElement(displayName);
+				FileDropTargetListener.filePath = normalized;
+				lastIndex = playlistModel.getSize() - 1;
+				lastPlayable = normalized;
+			}
+			if (lastIndex >= 0) {
+				suppressSelectionPlay = true;
+				playlistView.setSelectedIndex(lastIndex);
+				currentMediaIndex = lastIndex;
+				if (lastPlayable != null) {
+					mediaPlayerListComponent.mediaPlayer().media().play(lastPlayable);
+				}
+			}
+		});
+	}
+
+	private static void initializeYouTubeScene() {
+		if (youtubePanel == null)
+			return;
 		youtubeReady = false;
 		youtubeEngine = null;
-
 		SwingUtilities.invokeLater(() -> {
 			updateStatus("Loading YouTube...");
 			if (youtubeLyricsButton != null) {
 				youtubeLyricsButton.setEnabled(false);
 			}
 		});
-
 		ensureJavaFxRuntime();
 		Platform.runLater(() -> {
 			WebView webView = new WebView();
 			WebEngine engine = WebViewLogger.configureWebViewLogging(webView, WebViewLogger.LogSource.YOUTUBE);
 			youtubeEngine = engine;
-			javafx.scene.Scene scene = new javafx.scene.Scene(webView);
-			youtubePanel.setScene(scene);
-
+			youtubePanel.setScene(new Scene(webView));
 			engine.getLoadWorker().stateProperty().addListener((obs, oldState, newState) -> {
 				if (newState == Worker.State.SUCCEEDED) {
 					youtubeReady = true;
@@ -1927,177 +1771,115 @@ public class App extends JFrame {
 					});
 				}
 			});
-
-			try {
-				engine.load(YOUTUBE_URL);
-			} catch (Exception e) {
-				System.err.println("Error loading YouTube: " + e.getMessage());
-				e.printStackTrace();
-				youtubeReady = false;
-				SwingUtilities.invokeLater(() -> {
-					if (youtubeLyricsButton != null) {
-						youtubeLyricsButton.setEnabled(false);
-					}
-					updateStatus("Error loading YouTube");
-				});
-			}
+			engine.load(YOUTUBE_URL);
 		});
 	}
 
 	private static void initializeVimeoScene() {
-		if (vimeoPanel == null) {
+		if (vimeoPanel == null)
 			return;
-		}
 		vimeoReady = false;
 		vimeoEngine = null;
-
 		SwingUtilities.invokeLater(() -> {
 			updateStatus("Loading Vimeo...");
 			if (vimeoLyricsButton != null) {
 				vimeoLyricsButton.setEnabled(false);
 			}
 		});
-
 		ensureJavaFxRuntime();
 		Platform.runLater(() -> {
-			try {
-				WebView webView = new WebView();
-				WebEngine engine = WebViewLogger.configureWebViewLogging(webView, WebViewLogger.LogSource.VIMEO);
-				vimeoEngine = engine;
-				javafx.scene.Scene scene = new javafx.scene.Scene(webView);
-				vimeoPanel.setScene(scene);
-
-				engine.getLoadWorker().stateProperty().addListener((obs, oldState, newState) -> {
-					if (newState == Worker.State.SUCCEEDED) {
-						vimeoReady = true;
-						SwingUtilities.invokeLater(() -> {
-							if (vimeoLyricsButton != null) {
-								vimeoLyricsButton.setEnabled(true);
-							}
-							updateStatus("Vimeo ready");
-						});
-					} else if (newState == Worker.State.FAILED || newState == Worker.State.CANCELLED) {
-						vimeoReady = false;
-						SwingUtilities.invokeLater(() -> {
-							if (vimeoLyricsButton != null) {
-								vimeoLyricsButton.setEnabled(false);
-							}
-							updateStatus("Unable to load Vimeo");
-						});
-					}
-				});
-
-				try {
-					engine.load(VIMEO_URL);
-				} catch (Exception e) {
-					System.err.println("Error loading Vimeo: " + e.getMessage());
-					e.printStackTrace();
+			WebView webView = new WebView();
+			WebEngine engine = WebViewLogger.configureWebViewLogging(webView, WebViewLogger.LogSource.VIMEO);
+			vimeoEngine = engine;
+			vimeoPanel.setScene(new Scene(webView));
+			engine.getLoadWorker().stateProperty().addListener((obs, oldState, newState) -> {
+				if (newState == Worker.State.SUCCEEDED) {
+					vimeoReady = true;
+					SwingUtilities.invokeLater(() -> {
+						if (vimeoLyricsButton != null) {
+							vimeoLyricsButton.setEnabled(true);
+						}
+						updateStatus("Vimeo ready");
+					});
+				} else if (newState == Worker.State.FAILED || newState == Worker.State.CANCELLED) {
 					vimeoReady = false;
 					SwingUtilities.invokeLater(() -> {
 						if (vimeoLyricsButton != null) {
 							vimeoLyricsButton.setEnabled(false);
 						}
-						updateStatus("Error loading Vimeo");
+						updateStatus("Unable to load Vimeo");
 					});
 				}
-			} catch (Exception e) {
-				System.err.println("Error initializing Vimeo: " + e.getMessage());
-				e.printStackTrace();
-			}
+			});
+			engine.load(VIMEO_URL);
 		});
 	}
 
 	private static void showVimeoSubtitlesDialog() {
-		if (frame == null) {
+		if (frame == null)
 			return;
-		}
-		SubtitleSettingsDialog.showDialog(frame, mediaPlayerListComponent);
-	}
-
-	private static void showYouTubeSubtitlesDialog() {
-		if (frame == null) {
-			return;
-		}
 		SubtitleSettingsDialog.showDialog(frame, mediaPlayerListComponent);
 	}
 
 	private static void initializeGoMoviesScene() {
-		if (goMoviesPanel == null) {
+		if (goMoviesPanel == null)
 			return;
-		}
 		goMoviesReady = false;
 		goMoviesEngine = null;
-
 		SwingUtilities.invokeLater(() -> {
-			updateStatus("Loading GoMovies...");
+			updateStatus("Loading Go Movies...");
 			if (goMoviesLyricsButton != null) {
 				goMoviesLyricsButton.setEnabled(false);
 			}
 		});
-
 		ensureJavaFxRuntime();
 		Platform.runLater(() -> {
-			try {
-				WebView webView = new WebView();
-				WebEngine engine = WebViewLogger.configureWebViewLogging(webView, WebViewLogger.LogSource.GOMOVIES);
-				goMoviesEngine = engine;
-				javafx.scene.Scene scene = new javafx.scene.Scene(webView);
-				goMoviesPanel.setScene(scene);
-
-				engine.getLoadWorker().stateProperty().addListener((obs, oldState, newState) -> {
-					if (newState == Worker.State.SUCCEEDED) {
-						goMoviesReady = true;
-						SwingUtilities.invokeLater(() -> {
-							if (goMoviesLyricsButton != null) {
-								goMoviesLyricsButton.setEnabled(true);
-							}
-							updateStatus("GoMovies ready");
-						});
-					} else if (newState == Worker.State.FAILED || newState == Worker.State.CANCELLED) {
-						goMoviesReady = false;
-						SwingUtilities.invokeLater(() -> {
-							if (goMoviesLyricsButton != null) {
-								goMoviesLyricsButton.setEnabled(false);
-							}
-							updateStatus("Unable to load GoMovies");
-						});
-					}
-				});
-
-				try {
-					engine.load(GO_MOVIES_URL);
-				} catch (Exception e) {
-					System.err.println("Error loading GoMovies: " + e.getMessage());
-					e.printStackTrace();
+			WebView webView = new WebView();
+			WebEngine engine = WebViewLogger.configureWebViewLogging(webView, WebViewLogger.LogSource.GOMOVIES);
+			goMoviesEngine = engine;
+			goMoviesPanel.setScene(new Scene(webView));
+			engine.getLoadWorker().stateProperty().addListener((obs, oldState, newState) -> {
+				if (newState == Worker.State.SUCCEEDED) {
+					goMoviesReady = true;
+					SwingUtilities.invokeLater(() -> {
+						if (goMoviesLyricsButton != null) {
+							goMoviesLyricsButton.setEnabled(true);
+						}
+						updateStatus("Go Movies ready");
+					});
+				} else if (newState == Worker.State.FAILED || newState == Worker.State.CANCELLED) {
 					goMoviesReady = false;
 					SwingUtilities.invokeLater(() -> {
 						if (goMoviesLyricsButton != null) {
 							goMoviesLyricsButton.setEnabled(false);
 						}
-						updateStatus("Error loading GoMovies");
+						updateStatus("Unable to load Go Movies");
 					});
 				}
-			} catch (Exception e) {
-				System.err.println("Error initializing GoMovies: " + e.getMessage());
-				e.printStackTrace();
-			}
+			});
+			engine.load(GO_MOVIES_URL);
 		});
 	}
 
 	private static void showGoMoviesSubtitlesDialog() {
-		if (frame == null) {
+		if (frame == null)
 			return;
-		}
+		SubtitleSettingsDialog.showDialog(frame, mediaPlayerListComponent);
+	}
+
+	private static void showYouTubeSubtitlesDialog() {
+		if (frame == null)
+			return;
 		SubtitleSettingsDialog.showDialog(frame, mediaPlayerListComponent);
 	}
 
 	private static boolean isSubtitlePath(String path) {
-		if (path == null) {
+		if (path == null)
 			return false;
-		}
 		String lower = path.toLowerCase();
-		return lower.endsWith(".srt") || lower.endsWith(".ass") || lower.endsWith(".ssa") ||
-				lower.endsWith(".vtt") || lower.endsWith(".lrc");
+		return lower.endsWith(".srt") || lower.endsWith(".ass") || lower.endsWith(".ssa") || lower.endsWith(".vtt")
+				|| lower.endsWith(".sub") || lower.endsWith(".idx") || lower.endsWith(".ttml") || lower.endsWith(".sbv")
+				|| lower.endsWith(".lrc");
 	}
 
 	private static boolean isUsableMediaKey(String key) {
@@ -2227,10 +2009,14 @@ public class App extends JFrame {
 
 	private static final int FRAME_WIDTH = 1000;
 	private static final int FRAME_HEIGHT = 600;
+	private static final int SIDE_PANEL_WIDTH = 300;
+	private static final int SIDE_PANEL_HEIGHT = 300;
 	private static final int VOLUME_MAX = 200;
 	private static final int SKIP_MS = 10_000;
 	private static final int TIMER_DELAY_MS = 100;
 	private static final int PERCENT_SCALE = 100;
+	private static final int DIALOG_LIST_WIDTH = 300;
+	private static final int DIALOG_LIST_HEIGHT = 250;
 
 	// Subtitle sync offset (ms). Positive delays the subtitle, negative advances
 	// it.
@@ -2269,131 +2055,10 @@ public class App extends JFrame {
 		this.addWindowListener(new java.awt.event.WindowAdapter() {
 			@Override
 			public void windowClosing(java.awt.event.WindowEvent windowEvent) {
-				cleanupResources();
+				mediaPlayerListComponent.release();
 			}
 		});
 
-	}
-
-	/**
-	 * Comprehensive cleanup of all resources to prevent memory leaks and crashes
-	 */
-	private static void cleanupResources() {
-		LOGGER.info("Starting comprehensive resource cleanup...");
-
-		try {
-			// Stop ambient animation timer
-			if (ambientTimer != null) {
-				ambientTimer.stop();
-				ambientTimer = null;
-			}
-
-			// Stop books directory watcher
-			stopBooksDirectoryWatcher();
-
-			// Clean up media player components
-			cleanupMediaPlayerComponents();
-
-			// Clean up torrent streamer
-			cleanupTorrentStreamer();
-
-			// Clean up JavaFX resources
-			cleanupJavaFxResources();
-
-			LOGGER.info("Resource cleanup completed");
-		} catch (Exception e) {
-			LOGGER.log(Level.SEVERE, "Error during resource cleanup: " + e.getMessage(), e);
-		}
-	}
-
-	/**
-	 * Clean up all media player components safely
-	 */
-	private static void cleanupMediaPlayerComponents() {
-		try {
-			// Clean up main media player list component
-			if (mediaPlayerListComponent != null) {
-				try {
-					// Stop playback first
-					if (mediaPlayerListComponent.mediaPlayer() != null) {
-						mediaPlayerListComponent.mediaPlayer().controls().stop();
-						// Give it a moment to stop
-						Thread.sleep(100);
-					}
-					mediaPlayerListComponent.release();
-				} catch (Exception e) {
-					LOGGER.log(Level.WARNING, "Error releasing media player list component: " + e.getMessage(), e);
-				} finally {
-					mediaPlayerListComponent = null;
-				}
-			}
-
-			// Clean up torrent media player
-			if (torrentMediaPlayer != null) {
-				try {
-					// Stop playback first
-					if (torrentMediaPlayer.mediaPlayer() != null) {
-						torrentMediaPlayer.mediaPlayer().controls().stop();
-						Thread.sleep(100);
-					}
-					torrentMediaPlayer.release();
-				} catch (Exception e) {
-					LOGGER.log(Level.WARNING, "Error releasing torrent media player: " + e.getMessage(), e);
-				} finally {
-					torrentMediaPlayer = null;
-				}
-			}
-
-			// Clean up subtitle listener component
-			if (subtitleListenerComponent != null) {
-				try {
-					detachSubtitleListener();
-				} catch (Exception e) {
-					LOGGER.log(Level.WARNING, "Error detaching subtitle listener: " + e.getMessage(), e);
-				}
-			}
-
-		} catch (Exception e) {
-			LOGGER.log(Level.SEVERE, "Error during media player cleanup: " + e.getMessage(), e);
-		}
-	}
-
-	/**
-	 * Clean up torrent streamer resources
-	 */
-	private static void cleanupTorrentStreamer() {
-		if (libtorrentStreamer != null) {
-			try {
-				libtorrentStreamer.close();
-			} catch (Exception e) {
-				LOGGER.log(Level.WARNING, "Error closing torrent streamer: " + e.getMessage(), e);
-			} finally {
-				libtorrentStreamer = null;
-			}
-		}
-	}
-
-	/**
-	 * Clean up JavaFX resources
-	 */
-	private static void cleanupJavaFxResources() {
-		try {
-			// Clean up WebEngine references
-			bookReaderEngine = null;
-			youtubeEngine = null;
-			vimeoEngine = null;
-			goMoviesEngine = null;
-
-			// Reset JavaFX state flags
-			bookReaderReady = false;
-			youtubeReady = false;
-			vimeoReady = false;
-			goMoviesReady = false;
-			javafxRuntimeInitialized.set(false);
-
-		} catch (Exception e) {
-			LOGGER.log(Level.WARNING, "Error during JavaFX cleanup: " + e.getMessage(), e);
-		}
 	}
 
 	// Decompress a .gz file to the same directory
@@ -2629,7 +2294,7 @@ public class App extends JFrame {
 			try {
 				String baseName = pdfFile.getName().replaceFirst("(?i)\\.pdf$", "");
 				String folderName = sanitizeBookFolderName(baseName);
-				Path bookFolder = BOOKS_BASE_DIR.resolve(folderName);
+				Path bookFolder = getBooksBaseDir().resolve(folderName);
 				File bookDirFile = bookFolder.toFile();
 				boolean reuseExisting;
 				List<String> imagePaths;
@@ -2686,8 +2351,9 @@ public class App extends JFrame {
 				String manifestJson = PdfUtils.generateBookReaderManifest(pdfFile.getAbsolutePath(), imagePaths,
 						folderName);
 				Files.writeString(bookFolder.resolve("manifest.json"), manifestJson, StandardCharsets.UTF_8);
-				Path runtimeBookFolder = RUNTIME_BOOKS_DIR.resolve(folderName);
-				Files.createDirectories(RUNTIME_BOOKS_DIR);
+				Path runtimeBooksDir = getBooksBaseDir().getParent();
+				Path runtimeBookFolder = runtimeBooksDir.resolve(folderName);
+				Files.createDirectories(runtimeBooksDir);
 				if (!Files.exists(runtimeBookFolder) || !reuseExisting) {
 					copyDirectory(bookFolder, runtimeBookFolder);
 				}
@@ -2821,7 +2487,7 @@ public class App extends JFrame {
 		if (folderName == null || folderName.isBlank()) {
 			return;
 		}
-		Path bookFolder = BOOKS_BASE_DIR.resolve(folderName);
+		Path bookFolder = getBooksBaseDir().resolve(folderName);
 		if (!Files.exists(bookFolder)) {
 			swingInvoke(() -> updateStatus("Book assets missing for " + folderName));
 			return;
@@ -2864,117 +2530,6 @@ public class App extends JFrame {
 		}
 	}
 
-	/**
-	 * Process OCR on a book page image and return text data as JSON
-	 * This method can be called from JavaScript via the BookReaderBridge
-	 */
-	public static String processBookPageOCR(String bookFolder, String imageFileName, int pageIndex) {
-		try {
-			LOGGER.info("=== JAVA OCR REQUEST ===");
-			LOGGER.info("Book folder: " + bookFolder);
-			LOGGER.info("Image file: " + imageFileName);
-			LOGGER.info("Page index: " + pageIndex);
-			LOGGER.info("Tess4JOCR initialized: " + Tess4JOCR.isInitialized());
-			LOGGER.info("Tessdata path: " + Tess4JOCR.getTessdataPath());
-
-			if (!Tess4JOCR.isInitialized()) {
-				LOGGER.warning("Tesseract OCR not available, falling back to JavaScript OCR");
-				return "{\"error\": \"Tesseract not initialized\", \"tessdataPath\": \"" + Tess4JOCR.getTessdataPath()
-						+ "\"}";
-			}
-
-			String decodedImageFileName = imageFileName;
-			try {
-				decodedImageFileName = java.net.URLDecoder.decode(imageFileName, "UTF-8");
-				if (!decodedImageFileName.equals(imageFileName)) {
-					LOGGER.info("Decoded image filename: " + decodedImageFileName);
-				}
-			} catch (Exception e) {
-				LOGGER.warning("Failed to decode image filename, using original: " + e.getMessage());
-			}
-
-			// Check runtime location first (where images are served from)
-			Path runtimeBookPath = RUNTIME_BOOKS_DIR.resolve(bookFolder);
-			Path bookPath;
-			if (Files.exists(runtimeBookPath)) {
-				bookPath = runtimeBookPath;
-				LOGGER.info("Using runtime book path: " + bookPath);
-			} else {
-				bookPath = BOOKS_BASE_DIR.resolve(bookFolder);
-				LOGGER.info("Using source book path: " + bookPath);
-			}
-			Path imagePath = bookPath.resolve(decodedImageFileName);
-
-			if (!Files.exists(imagePath)) {
-				// Try runtime location with decoded filename
-				imagePath = runtimeBookPath.resolve(decodedImageFileName);
-				if (!Files.exists(imagePath)) {
-					// Try with original encoded filename as fallback
-					imagePath = runtimeBookPath.resolve(imageFileName);
-					if (!Files.exists(imagePath)) {
-						LOGGER.warning(
-								"Image file not found: " + decodedImageFileName + " (original: " + imageFileName + ")");
-						return "{\"error\": \"Image file not found: " + decodedImageFileName + "\"}";
-					}
-				}
-			}
-
-			LOGGER.info("Processing OCR for book page: " + imagePath.toString());
-
-			// Perform OCR
-			List<net.sourceforge.tess4j.Word> words = Tess4JOCR.getWordsWithBoundingBoxes(imagePath.toFile());
-
-			LOGGER.info("OCR completed, found " + words.size() + " words");
-
-			// Convert to JSON format compatible with JavaScript
-			StringBuilder json = new StringBuilder();
-			json.append("{\"words\": [");
-
-			for (int i = 0; i < words.size(); i++) {
-				net.sourceforge.tess4j.Word word = words.get(i);
-				if (i > 0)
-					json.append(",");
-
-				json.append("{");
-				json.append("\"text\": \"").append(escapeJsonString(word.getText())).append("\",");
-				json.append("\"x\": ").append(word.getBoundingBox().x).append(",");
-				json.append("\"y\": ").append(word.getBoundingBox().y).append(",");
-				json.append("\"width\": ").append(word.getBoundingBox().width).append(",");
-				json.append("\"height\": ").append(word.getBoundingBox().height).append(",");
-				json.append("\"confidence\": ").append(word.getConfidence());
-				json.append("}");
-			}
-
-			json.append("], \"pageIndex\": ").append(pageIndex);
-			json.append(", \"totalWords\": ").append(words.size());
-			json.append("}");
-
-			String result = json.toString();
-			LOGGER.info("OCR JSON result length: " + result.length());
-			LOGGER.info("=== JAVA OCR COMPLETE ===");
-
-			return result;
-
-		} catch (Exception e) {
-			LOGGER.severe("OCR processing failed for page " + pageIndex + ": " + e.getMessage());
-			e.printStackTrace();
-			return "{\"error\": \"OCR processing failed: " + escapeJsonString(e.getMessage()) + "\"}";
-		}
-	}
-
-	/**
-	 * Escape special characters in JSON strings
-	 */
-	private static String escapeJsonString(String text) {
-		if (text == null)
-			return "";
-		return text.replace("\\", "\\\\")
-				.replace("\"", "\\\"")
-				.replace("\n", "\\n")
-				.replace("\r", "\\r")
-				.replace("\t", "\\t");
-	}
-
 	private static List<String> collectExistingBookImages(Path bookFolder) throws IOException {
 		if (bookFolder == null || !Files.isDirectory(bookFolder)) {
 			return List.of();
@@ -2990,7 +2545,7 @@ public class App extends JFrame {
 		if (path == null || !Files.isRegularFile(path)) {
 			return false;
 		}
-		String name = path.getFileName().toString().toLowerCase(Locale.getDefault());
+		String name = path.getFileName().toString().toLowerCase(Locale.ROOT);
 		for (String ext : BOOK_IMAGE_EXTENSIONS) {
 			if (name.endsWith(ext)) {
 				return true;
@@ -3021,7 +2576,7 @@ public class App extends JFrame {
 	private static void promptDeleteBook() {
 		swingInvoke(() -> {
 			List<Path> bookFolders;
-			try (Stream<Path> stream = Files.list(BOOKS_BASE_DIR)) {
+			try (Stream<Path> stream = Files.list(getBooksBaseDir())) {
 				bookFolders = stream.filter(Files::isDirectory).sorted().limit(24).collect(Collectors.toList());
 			} catch (IOException e) {
 				updateStatus("Unable to list books: " + e.getMessage());
@@ -3057,7 +2612,7 @@ public class App extends JFrame {
 		if (folderName == null || folderName.isBlank()) {
 			return;
 		}
-		Path bookFolder = BOOKS_BASE_DIR.resolve(folderName);
+		Path bookFolder = getBooksBaseDir().resolve(folderName);
 		if (!Files.exists(bookFolder)) {
 			swingInvoke(() -> updateStatus("Book assets missing for " + folderName));
 			return;
@@ -3110,14 +2665,6 @@ public class App extends JFrame {
 		public void bookReaderExitFullscreen() {
 			SwingUtilities.invokeLater(App::exitBookReaderFullscreen);
 		}
-
-		/**
-		 * Process OCR on a book page image and return text data as JSON
-		 * This method can be called from JavaScript via the BookReaderBridge
-		 */
-		public String processBookPageOCR(String bookFolder, String imageFileName, int pageIndex) {
-			return App.processBookPageOCR(bookFolder, imageFileName, pageIndex);
-		}
 	}
 
 	private static void enterBookReaderFullscreen() {
@@ -3163,7 +2710,6 @@ public class App extends JFrame {
 				frame.setUndecorated(true);
 				frame.setResizable(false);
 				frame.setVisible(true);
-
 			}
 			fullscreenDevice.setFullScreenWindow(frame);
 		} else {
@@ -3229,20 +2775,6 @@ public class App extends JFrame {
 		frame.setAlwaysOnTop(savedFrameAlwaysOnTop);
 		if (decorationChanged) {
 			frame.setVisible(true);
-
-			// Process pending media file from command line arguments
-			if (pendingMediaFile != null) {
-				SwingUtilities.invokeLater(() -> {
-					// Switch to media player view
-					showMediaPlayerView();
-					// Add the media file to the playlist and play it
-					FileDropTargetListener.filePath = pendingMediaFile.getAbsolutePath();
-					mediaPlayerListComponent.mediaListPlayer().list().media().add(pendingMediaFile.getAbsolutePath());
-					playlistModel.addElement(pendingMediaFile.getName());
-					playlistView.setSelectedIndex(playlistModel.getSize() - 1);
-					mediaPlayerListComponent.mediaListPlayer().controls().play();
-				});
-			}
 		}
 		frame.revalidate();
 		frame.repaint();
@@ -3274,18 +2806,6 @@ public class App extends JFrame {
 				baseDir = new File(System.getProperty("user.dir"));
 			}
 
-			// Set up books directories relative to installation directory
-			BOOKS_BASE_DIR = Paths.get(baseDir.getAbsolutePath(), "books");
-			RUNTIME_BOOKS_DIR = Paths.get(baseDir.getAbsolutePath(), "target", "classes", "bookreader", "books");
-
-			// Create bookreader folder in the working directory
-			Path bookreaderDir = Paths.get(baseDir.getAbsolutePath(), "bookreader");
-			try {
-				Files.createDirectories(bookreaderDir);
-			} catch (IOException e) {
-				System.err.println("Failed to create bookreader directory: " + e.getMessage());
-			}
-
 			// Set up VLC paths
 			String vlcPath = new File(baseDir, "resources").getAbsolutePath();
 			String vlcPluginsPath = vlcPath + File.separator + "plugins";
@@ -3294,36 +2814,6 @@ public class App extends JFrame {
 			JOptionPane.showMessageDialog(null, "Failed to initialize VLC: " + e.getMessage(),
 					"VLC Initialization Error", JOptionPane.ERROR_MESSAGE);
 			System.exit(1);
-		}
-
-		// // Handle command line arguments for opening media files directly
-		// if (args.length > 0) {
-		// String mediaPath = args[0];
-		// File mediaFile = new File(mediaPath);
-		// if (mediaFile.exists() && mediaFile.canRead()) {
-		// // Store for later processing after UI is initialized
-		// pendingMediaFile = mediaFile;
-
-		// }
-		// }
-
-		// Process command line arguments after UI is fully initialized
-		if (args.length > 0) {
-			System.out.println("arguments are: " + args[0]);
-			String mediaPath = args[0];
-			File mediaFile = new File(mediaPath);
-			if (mediaFile.exists() && mediaFile.canRead()) {
-				SwingUtilities.invokeLater(() -> {
-					// Switch to media player view
-					showMediaPlayerView();
-					// Add the media file to the playlist and play it
-					FileDropTargetListener.filePath = mediaFile.getAbsolutePath();
-					mediaPlayerListComponent.mediaListPlayer().list().media().add(mediaFile.getAbsolutePath());
-					playlistModel.addElement(mediaFile.getName());
-					playlistView.setSelectedIndex(playlistModel.getSize() - 1);
-					mediaPlayerListComponent.mediaListPlayer().controls().play();
-				});
-			}
 		}
 
 		// Add shutdown hook for cleanup
@@ -3476,8 +2966,7 @@ public class App extends JFrame {
 					@SuppressWarnings("unchecked")
 					List<File> files = (List<File>) transferable.getTransferData(DataFlavor.javaFileListFlavor);
 					File pdf = files.stream().filter(File::isFile)
-							.filter(file -> file.getName().toLowerCase(Locale.getDefault()).endsWith(".pdf"))
-							.findFirst()
+							.filter(file -> file.getName().toLowerCase(Locale.ROOT).endsWith(".pdf")).findFirst()
 							.orElse(null);
 					if (pdf != null) {
 						String pdfPath = pdf.getAbsolutePath();
@@ -3963,6 +3452,9 @@ public class App extends JFrame {
 					}
 				});
 
+				// Set up drag and drop for PDF files
+				setupDragAndDrop(webView, engine);
+
 				// Set the scene
 				bookReaderPanel.setScene(new Scene(webView));
 
@@ -4001,8 +3493,125 @@ public class App extends JFrame {
 		});
 	}
 
+	/**
+	 * Sets up drag and drop functionality for the WebView to handle PDF files.
+	 * 
+	 * @param webView The WebView to set up drag and drop for
+	 * @param engine  The WebEngine associated with the WebView (unused in this
+	 *                implementation)
+	 */
+	private static void setupDragAndDrop(WebView webView, WebEngine engine) {
+		// Set up drag over handler
+		webView.setOnDragOver(event -> {
+			if (event.getGestureSource() != webView) {
+				event.acceptTransferModes(TransferMode.COPY_OR_MOVE);
+			}
+			event.consume();
+		});
+
+		// Set up drag dropped handler
+		webView.setOnDragDropped(event -> {
+			Dragboard dragboard = event.getDragboard();
+			boolean success = false;
+
+			if (dragboard.hasFiles()) {
+				File pdfFile = dragboard.getFiles().stream()
+						.filter(File::isFile)
+						.filter(file -> file.getName().toLowerCase(Locale.ROOT).endsWith(".pdf"))
+						.findFirst()
+						.orElse(null);
+
+				if (pdfFile != null) {
+					success = true;
+					String pdfPath = pdfFile.getAbsolutePath();
+					SwingUtilities.invokeLater(() -> openPdfInBookReader(pdfPath));
+				}
+			} else if (dragboard.hasUrl()) {
+				try {
+					URI uri = new URI(dragboard.getUrl());
+					if ("file".equalsIgnoreCase(uri.getScheme())) {
+						File pdfFile = new File(uri);
+						if (pdfFile.isFile() && pdfFile.getName().toLowerCase(Locale.ROOT).endsWith(".pdf")) {
+							success = true;
+							String pdfPath = pdfFile.getAbsolutePath();
+							SwingUtilities.invokeLater(() -> openPdfInBookReader(pdfPath));
+						}
+					}
+				} catch (Exception ignore) {
+					// Ignore invalid URIs
+				}
+			} else if (dragboard.hasString()) {
+				String text = dragboard.getString();
+				if (text != null) {
+					File pdfFile = new File(text.trim());
+					if (pdfFile.isFile() && pdfFile.getName().toLowerCase(Locale.ROOT).endsWith(".pdf")) {
+						success = true;
+						String pdfPath = pdfFile.getAbsolutePath();
+						SwingUtilities.invokeLater(() -> openPdfInBookReader(pdfPath));
+					}
+				}
+			}
+
+			event.setDropCompleted(success);
+			event.consume();
+		});
+	}
+
+	/**
+	 * Sets up drag and drop functionality for the WebView to handle PDF files.
+	 * This is an overloaded version that only takes a WebView parameter.
+	 * 
+	 * @param webView The WebView to set up drag and drop for
+	 */
+	private static void setupDragAndDrop(WebView webView) {
+		setupDragAndDrop(webView, null);
+	}
+
+	private static final String BOOK_READER_CSS = "* { " +
+			"-webkit-user-select: text !important; " +
+			"-moz-user-select: text !important; " +
+			"-ms-user-select: text !important; " +
+			"user-select: text !important; " +
+			"cursor: auto !important; " +
+			"pointer-events: auto !important; " +
+			"} " +
+			".BRtextOverlay, .BRtextOverlay * { " +
+			"pointer-events: auto !important; " +
+			"-webkit-user-select: text !important; " +
+			"-moz-user-select: text !important; " +
+			"-ms-user-select: text !important; " +
+			"user-select: text !important; " +
+			"} " +
+			"div, span, p, a, h1, h2, h3, h4, h5, h6 { " +
+			"-webkit-user-select: text !important; " +
+			"-moz-user-select: text !important; " +
+			"-ms-user-select: text !important; " +
+			"user-select: text !important; " +
+			"}";
+
 	private static String resolveBookReaderEntryPoint() {
 		System.out.println("Looking for BookReader entry point...");
+
+		// Check installed app directory (for packaged applications)
+		try {
+			String appPath = System.getProperty("jpackage.app-path");
+			if (appPath != null) {
+				Path appDir = Paths.get(appPath).getParent();
+				if (appDir != null) {
+					Path installedBookReaderPath = appDir.resolve("app").resolve("classes").resolve("bookreader")
+							.resolve("BookReaderDemo").resolve("immersion-mode.html");
+					if (Files.exists(installedBookReaderPath)) {
+						System.out.println(
+								"Found BookReader in installed app: " + installedBookReaderPath.toAbsolutePath());
+						return installedBookReaderPath.toUri().toString();
+					} else {
+						System.out.println("Not found in installed app: " + installedBookReaderPath.toAbsolutePath());
+					}
+				}
+			}
+		} catch (Exception e) {
+			System.out.println("Error checking installed app directory: " + e.getMessage());
+		}
 
 		// Prefer filesystem in src/main/resources so dynamically generated assets are
 		// visible
@@ -4049,7 +3658,7 @@ public class App extends JFrame {
 	}
 
 	private static String generateBookshelfLandingHtml() {
-		Path booksDir = BOOKS_BASE_DIR;
+		Path booksDir = getBooksBaseDir();
 		List<Path> entries = Collections.emptyList();
 		try (Stream<Path> stream = Files.list(booksDir)) {
 			entries = stream.filter(Files::isDirectory).sorted().limit(24).collect(Collectors.toList());
@@ -4102,7 +3711,7 @@ public class App extends JFrame {
 		}
 		try (Stream<Path> stream = Files.list(bookDir)) {
 			return stream.filter(Files::isRegularFile).filter(path -> {
-				String lower = path.getFileName().toString().toLowerCase(Locale.getDefault());
+				String lower = path.getFileName().toString().toLowerCase(Locale.ROOT);
 				return lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".png")
 						|| lower.endsWith(".gif") || lower.endsWith(".webp");
 			}).findFirst().orElse(null);
@@ -4220,28 +3829,13 @@ public class App extends JFrame {
 				torrentView = buildTorrentView();
 				mainViewPanel.add(torrentView, "torrent");
 
-				// Initialize LibtorrentStreamer with the necessary UI components only if not
-				// already initialized
-				if (libtorrentStreamer == null) {
-					// Get the JSplitPane from the torrent view
-					JSplitPane splitPane = (JSplitPane) torrentView.getComponent(1);
-					// The left component is the torrent selection panel (content panel)
-					JPanel contentPanel = (JPanel) splitPane.getLeftComponent();
-					libtorrentStreamer = new LibtorrentStreamer(frame, contentPanel, torrentMediaPanel);
-				}
+				// Initialize LibtorrentStreamer with the necessary UI components
+				JPanel contentPanel = (JPanel) torrentView.getComponent(1);
+				libtorrentStreamer = new LibtorrentStreamer(frame, contentPanel, torrentMediaPanel);
 			}
 			mainViewLayout.show(mainViewPanel, "torrent");
 			setActiveTask("torrent");
 			updateStatus("Torrent Stream");
-
-			// Open streaming link if no torrent is loaded (with a small delay to ensure
-			// component is visible)
-			Timer timer = new Timer(500, e -> {
-				openStreamingLinkIfNoTorrent();
-				((Timer) e.getSource()).stop();
-			});
-			timer.setRepeats(false);
-			timer.start();
 
 			// Auto-start the demo torrent if not already started
 			if (!torrentLandingAutoStarted) {
@@ -4254,22 +3848,6 @@ public class App extends JFrame {
 		});
 	}
 
-	private static void openStreamingLinkIfNoTorrent() {
-		// Check if there's no torrent loaded
-		if (libtorrentStreamer != null && libtorrentStreamer.getValidTorrentHandle() == null) {
-			try {
-				// Open YouTube streaming service when no torrent is loaded
-				SwingUtilities.invokeLater(() -> {
-					openYouTubeView();
-					updateStatus("No torrent loaded - opened YouTube for streaming content");
-				});
-			} catch (Exception e) {
-				LOGGER.log(Level.WARNING, "Error opening streaming link: " + e.getMessage(), e);
-				updateStatus("Unable to open streaming service");
-			}
-		}
-	}
-
 	private static void loadTorrentFromMagnet(String magnetLink) {
 		isMagnetLink = true;
 		if (magnetLink == null || magnetLink.trim().isEmpty()) {
@@ -4278,17 +3856,13 @@ public class App extends JFrame {
 			return;
 		}
 
-		// Ensure libtorrentStreamer is properly initialized with UI components
+		// Initialize libtorrentStreamer if not already done
 		if (libtorrentStreamer == null) {
-			// Initialize torrent view first to get the proper UI components
-			if (torrentView == null) {
-				torrentView = buildTorrentView();
-			}
-			// The buildTorrentView method will initialize libtorrentStreamer properly
+			libtorrentStreamer = new LibtorrentStreamer();
 		}
 
 		// Set up metadata callback
-		libtorrentStreamer.setMetadataCallback((java.util.List<vlcj.llg_mc.App.TorrentFileEntry> entries) -> {
+		libtorrentStreamer.setMetadataCallback(entries -> {
 			if (entries != null && !entries.isEmpty()) {
 				SwingUtilities.invokeLater(() -> {
 					torrentFileListModel.clear();
@@ -4302,45 +3876,13 @@ public class App extends JFrame {
 
 		new Thread(() -> {
 			try {
-				// Fetch metadata using HTTP endpoints and create a torrent file
-				List<TorrentFileEntry> entries = fetchTorrentMetadata(magnetLink);
-				if (entries == null || entries.isEmpty()) {
-					SwingUtilities.invokeLater(() -> {
-						JOptionPane.showMessageDialog(frame,
-								"Could not fetch metadata for this magnet link.\n" +
-										"The magnet link may be invalid or no metadata is available.",
-								"Magnet Link Error", JOptionPane.ERROR_MESSAGE);
-					});
-					return;
-				}
-
-				// Create a temporary torrent file from the metadata
-				// Since we can't create a real .torrent file from magnet metadata easily,
-				// we'll use the existing approach but ensure the streamer is properly
-				// initialized
-				SwingUtilities.invokeLater(() -> {
-					torrentFileListModel.clear();
-					for (TorrentFileEntry entry : entries) {
-						torrentFileListModel.addElement(entry);
-					}
-					updateStatus("Loaded " + entries.size() + " files from magnet link");
-
-					// Since we can't create a real torrent session from magnet metadata,
-					// we'll show a message that magnet links need to be converted to torrent files
-					JOptionPane.showMessageDialog(frame,
-							"Magnet link metadata loaded successfully.\n\n" +
-									"To actually download and stream files, you need to obtain the .torrent file\n" +
-									"from a torrent site and load it using the 'Browse' button.\n\n" +
-									"Magnet links in this version are used only for previewing torrent contents.",
-							"Magnet Link Support", JOptionPane.INFORMATION_MESSAGE);
-				});
-
+				libtorrentStreamer.loadMagnetLink(magnetLink);
 			} catch (Exception e) {
 				e.printStackTrace();
 				SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(frame,
-						"Failed to load magnet link: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE));
+						"Failed to load torrent: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE));
 			}
-		}, "MagnetLoader").start();
+		}, "TorrentLoader").start();
 	}
 
 	private static LibtorrentStreamer libtorrentStreamer;
@@ -5232,88 +4774,21 @@ public class App extends JFrame {
 
 		// This line is no longer needed as we add controlPanel directly to the panel
 
-		playButton.addActionListener(e -> {
-			try {
-				if (mediaPlayerListComponent != null && mediaPlayerListComponent.mediaPlayer() != null) {
-					mediaPlayerListComponent.mediaPlayer().controls().play();
-					updateStatus("Playing media");
-				} else {
-					updateStatus("Media player not initialized");
-				}
-			} catch (Exception ex) {
-				LOGGER.log(Level.WARNING, "Error playing media: " + ex.getMessage(), ex);
-				updateStatus("Error playing media: " + ex.getMessage());
-				JOptionPane.showMessageDialog(frame, "Error playing media: " + ex.getMessage(),
-						"Playback Error", JOptionPane.ERROR_MESSAGE);
-			}
-		});
+		playButton.addActionListener(e -> mediaPlayerListComponent.mediaPlayer().controls().play());
 
 		pauseButton.addActionListener((ActionEvent e) -> {
-			try {
-				if (mediaPlayerListComponent != null && mediaPlayerListComponent.mediaPlayer() != null) {
-					if (mediaPlayerListComponent.mediaPlayer().status().isPlaying()) {
-						mediaPlayerListComponent.mediaPlayer().controls().pause();
-						pauseButton.setText("Resume");
-						updateStatus("Media paused");
-					} else {
-						mediaPlayerListComponent.mediaPlayer().controls().play();
-						pauseButton.setText("Pause");
-						updateStatus("Media resumed");
-					}
-				} else {
-					updateStatus("Media player not initialized");
-				}
-			} catch (Exception ex) {
-				LOGGER.log(Level.WARNING, "Error controlling playback: " + ex.getMessage(), ex);
-				updateStatus("Error controlling playback: " + ex.getMessage());
-				JOptionPane.showMessageDialog(frame, "Error controlling playback: " + ex.getMessage(),
-						"Playback Error", JOptionPane.ERROR_MESSAGE);
+			if (mediaPlayerListComponent.mediaPlayer().status().isPlaying()) {
+				mediaPlayerListComponent.mediaPlayer().controls().pause();
+				pauseButton.setText("Resume");
+			} else {
+				mediaPlayerListComponent.mediaPlayer().controls().play();
+				pauseButton.setText("Pause");
 			}
 		});
 
-		stopButton.addActionListener(e -> {
-			try {
-				if (mediaPlayerListComponent != null && mediaPlayerListComponent.mediaPlayer() != null) {
-					mediaPlayerListComponent.mediaPlayer().controls().stop();
-					updateStatus("Playback stopped");
-				} else {
-					updateStatus("Media player not initialized");
-				}
-			} catch (Exception ex) {
-				LOGGER.log(Level.WARNING, "Error stopping media: " + ex.getMessage(), ex);
-				updateStatus("Error stopping media: " + ex.getMessage());
-				JOptionPane.showMessageDialog(frame, "Error stopping media: " + ex.getMessage(),
-						"Playback Error", JOptionPane.ERROR_MESSAGE);
-			}
-		});
-
-		skipForwardButton.addActionListener(e -> {
-			try {
-				if (mediaPlayerListComponent != null && mediaPlayerListComponent.mediaPlayer() != null) {
-					mediaPlayerListComponent.mediaPlayer().controls().skipTime(SKIP_MS);
-					updateStatus("Skipped forward " + (SKIP_MS / 1000) + " seconds");
-				} else {
-					updateStatus("Media player not initialized");
-				}
-			} catch (Exception ex) {
-				LOGGER.log(Level.WARNING, "Error skipping forward: " + ex.getMessage(), ex);
-				updateStatus("Error skipping forward: " + ex.getMessage());
-			}
-		});
-
-		skipBackButton.addActionListener(e -> {
-			try {
-				if (mediaPlayerListComponent != null && mediaPlayerListComponent.mediaPlayer() != null) {
-					mediaPlayerListComponent.mediaPlayer().controls().skipTime(-SKIP_MS);
-					updateStatus("Skipped back " + (SKIP_MS / 1000) + " seconds");
-				} else {
-					updateStatus("Media player not initialized");
-				}
-			} catch (Exception ex) {
-				LOGGER.log(Level.WARNING, "Error skipping back: " + ex.getMessage(), ex);
-				updateStatus("Error skipping back: " + ex.getMessage());
-			}
-		});
+		stopButton.addActionListener(e -> mediaPlayerListComponent.mediaPlayer().controls().stop());
+		skipForwardButton.addActionListener(e -> mediaPlayerListComponent.mediaPlayer().controls().skipTime(SKIP_MS));
+		skipBackButton.addActionListener(e -> mediaPlayerListComponent.mediaPlayer().controls().skipTime(-SKIP_MS));
 		muteSoundButton.addActionListener(new ActionListener() {
 
 			@Override
