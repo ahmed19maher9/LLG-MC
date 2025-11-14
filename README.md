@@ -5,7 +5,7 @@ A comprehensive, multi-modal media center application built in Java,javascript a
  [![GitHub version](https://img.shields.io/github/v/tag/ahmed19maher9/LLG-MC)](https://badge.fury.io/gh/ahmed19maher9%2LLG-MC) [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0) [![Github All Releases](https://img.shields.io/github/downloads/ahmed19maher9/LLG-MC/total)]()  [![Gitter](https://img.shields.io/gitter/room/ahmed19maher9/LLG-MC)](https://gitter.im/LLG-MC/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge) [![GitHub contributors](https://img.shields.io/github/contributors-anon/ahmed19maher9/LLG-MC)]() [![GitHub contributors](https://img.shields.io/github/issues-raw/ahmed19maher9/LLG-MC)]() [![GitHub contributors](https://img.shields.io/github/issues-closed-raw/ahmed19maher9/LLG-MC)]()
 [![Donate](https://img.shields.io/badge/Donate-Donorbox-green)](https://4fund.com/tsu72s)
 
-![LLG Media Center](https://i.ibb.co/Y4qCsgyh/llg-logo.png)
+![LLG Media Center](https://github.com/user-attachments/assets/09852197-4bbd-4599-a670-3ed80efb909a)
 
 ## Features
 
